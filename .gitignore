@@ -1,0 +1,35 @@
+# Environment configuration (contains sensitive info)
+.env
+
+# Log files
+*.log
+mastodon-upgrades.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.backup
+*.bak
+
+# SSH keys and secrets
+*.pem
+*.key
+id_rsa*
+*.p12
+
+# Database dumps
+*.sql
+*.dump
