@@ -211,9 +211,40 @@ if ! confirm "Do the changes look correct?"; then
 fi
 
 # Step 4: Update version in .env.production
-print_info "Updating version in .env.production..."
-if confirm "Edit .env.production to update version?"; then
-  nano -w +62 .env.production
+print_info "Updating version metadata in .env.production..."
+if [[ -f ".env.production" ]]; then
+  # Detect if Bird UI is installed
+  BIRD_UI_VERSION=""
+  if [[ -f "app/javascript/styles/mastodon-bird-ui/layout-single-column.scss" ]]; then
+    # Try to detect Bird UI version from comments in the file
+    BIRD_UI_VERSION=" + Mastodon Bird UI"
+  fi
+  
+  # Update MASTODON_VERSION_METADATA
+  if grep -q "^MASTODON_VERSION_METADATA=" .env.production; then
+    sed -i "s/^MASTODON_VERSION_METADATA=.*/MASTODON_VERSION_METADATA='$NEW_BRANCH$BIRD_UI_VERSION'/" .env.production
+    print_success "Version metadata updated to: $NEW_BRANCH$BIRD_UI_VERSION"
+  else
+    echo "MASTODON_VERSION_METADATA='$NEW_BRANCH$BIRD_UI_VERSION'" >> .env.production
+    print_success "Version metadata added: $NEW_BRANCH$BIRD_UI_VERSION"
+  fi
+  
+  # Update GITHUB_REPOSITORY for comparison link
+  GITHUB_COMPARE="mastodon/mastodon/compare/main...${YOUR_FORK_REPO:-mementomori-social/mastodon}:$NEW_BRANCH"
+  if grep -q "^GITHUB_REPOSITORY=" .env.production; then
+    sed -i "s|^GITHUB_REPOSITORY=.*|GITHUB_REPOSITORY=$GITHUB_COMPARE|" .env.production
+    print_success "GitHub repository comparison updated"
+  else
+    echo "GITHUB_REPOSITORY=$GITHUB_COMPARE" >> .env.production
+    print_success "GitHub repository comparison added"
+  fi
+  
+  # Optionally allow manual editing
+  if confirm "Do you want to manually edit .env.production for additional changes?"; then
+    nano -w +62 .env.production
+  fi
+else
+  print_warning ".env.production not found, skipping version update"
 fi
 
 # Check Ruby version
@@ -272,60 +303,31 @@ print_info "Clearing cache..."
 RAILS_ENV=production /home/mastodon/live/bin/tootctl cache clear
 print_success "Cache cleared"
 
-# Step 8: Search index reset (optional due to time)
-if confirm "Reset search index? (This will take a LONG time - recommend running in screen)"; then
-  print_warning "This operation can take hours. Consider running in a screen session."
-  if confirm "Continue with search index reset?"; then
-    print_info "Resetting search index..."
-    RAILS_ENV=production bin/tootctl search deploy --reset-chewy
-    print_success "Search index reset"
-  fi
-fi
 
-# Step 9: Rebuild search index (if needed)
-if confirm "Rebuild search index? (This will take a while)"; then
-  print_info "Rebuilding search index for accounts..."
-  RAILS_ENV=production bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096
-  
-  print_info "Rebuilding search index for statuses..."
-  RAILS_ENV=production bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096
-  print_success "Search index rebuilt"
-fi
-
-# Step 10: Restart services
-print_warning "About to restart Mastodon services - this will cause a brief outage"
+# Step 8: Restart services
+print_warning "About to restart Mastodon services - this will cause a brief interruption"
 if confirm "Restart services now?"; then
   print_info "Restarting Mastodon services..."
   
-  # Stop services in proper order
-  sudo systemctl stop mastodon-web.service
-  sudo systemctl stop mastodon-streaming.service
-  sudo systemctl stop mastodon-sidekiq.service
+  # Restart services in the same order as /usr/local/bin/restart-mastodon
+  sudo systemctl restart mastodon-sidekiq.service
+  sudo systemctl restart mastodon-streaming.service
+  sudo systemctl restart mastodon-web.service
   
-  # Stop specific sidekiq workers
-  sudo systemctl stop mastodon-sidekiq-1-default@35.service
-  sudo systemctl stop mastodon-sidekiq-2-default@35.service
-  sudo systemctl stop mastodon-sidekiq-1-ingress@25.service
-  sudo systemctl stop mastodon-sidekiq-2-ingress@25.service
-  sudo systemctl stop mastodon-sidekiq-pull@40.service
-  sudo systemctl stop mastodon-sidekiq-push@35.service
-  sudo systemctl stop mastodon-sidekiq-mailers@20.service
-  sudo systemctl stop mastodon-sidekiq-scheduler@5.service
-  sudo systemctl stop mastodon-fasp.service
+  # Restart specific sidekiq workers
+  sudo systemctl restart mastodon-sidekiq-1-default@35.service
+  sudo systemctl restart mastodon-sidekiq-2-default@35.service
+  sudo systemctl restart mastodon-sidekiq-1-ingress@25.service
+  sudo systemctl restart mastodon-sidekiq-2-ingress@25.service
+  sudo systemctl restart mastodon-sidekiq-pull@40.service
+  sudo systemctl restart mastodon-sidekiq-push@35.service
+  sudo systemctl restart mastodon-sidekiq-mailers@20.service
+  sudo systemctl restart mastodon-sidekiq-scheduler@5.service
   
-  # Start services in proper order
-  sudo systemctl start mastodon-sidekiq.service
-  sudo systemctl start mastodon-sidekiq-1-default@35.service
-  sudo systemctl start mastodon-sidekiq-2-default@35.service
-  sudo systemctl start mastodon-sidekiq-1-ingress@25.service
-  sudo systemctl start mastodon-sidekiq-2-ingress@25.service
-  sudo systemctl start mastodon-sidekiq-pull@40.service
-  sudo systemctl start mastodon-sidekiq-push@35.service
-  sudo systemctl start mastodon-sidekiq-mailers@20.service
-  sudo systemctl start mastodon-sidekiq-scheduler@5.service
-  sudo systemctl start mastodon-fasp.service
-  sudo systemctl start mastodon-streaming.service
-  sudo systemctl start mastodon-web.service
+  # Check if fasp service exists before restarting
+  if systemctl list-units --all | grep -q "mastodon-sidekiq-fasp@1"; then
+    sudo systemctl restart mastodon-sidekiq-fasp@1.service
+  fi
   
   print_success "Services restarted"
 else
@@ -358,3 +360,13 @@ print_info "To monitor logs:"
 echo "  sudo journalctl -u mastodon-web.service -f"
 echo "  sudo journalctl -u mastodon-sidekiq.service -f"
 echo "  sudo journalctl -u mastodon-streaming.service -f"
+echo
+print_info "Optional: Search index maintenance (run in screen/tmux):"
+echo "  # Reset search index (WARNING: Takes hours!):"
+echo "  RAILS_ENV=production bin/tootctl search deploy --reset-chewy"
+echo
+echo "  # Or just rebuild search index (faster):"
+echo "  RAILS_ENV=production bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096"
+echo "  RAILS_ENV=production bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096"
+echo
+print_warning "Only run search index commands if search is not working properly!"

@@ -493,15 +493,32 @@ else
 fi
 
 # Step 17: Update version in .env.production
-print_info "Updating version in .env.production..."
+print_info "Updating version metadata in .env.production..."
 if [[ -f ".env.production" ]]; then
-  # Update the version line automatically
+  # Detect if Bird UI is installed
+  BIRD_UI_VERSION=""
+  if [[ -f "app/javascript/styles/mastodon-bird-ui/layout-single-column.scss" ]]; then
+    # Try to detect Bird UI version from comments in the file
+    BIRD_UI_VERSION=" + Mastodon Bird UI"
+  fi
+  
+  # Update MASTODON_VERSION_METADATA
   if grep -q "^MASTODON_VERSION_METADATA=" .env.production; then
-    sed -i "s/^MASTODON_VERSION_METADATA=.*/MASTODON_VERSION_METADATA=\"+$NEW_BRANCH\"/" .env.production
-    print_success "Version updated to +$NEW_BRANCH in .env.production"
+    sed -i "s/^MASTODON_VERSION_METADATA=.*/MASTODON_VERSION_METADATA='$NEW_BRANCH$BIRD_UI_VERSION'/" .env.production
+    print_success "Version metadata updated to: $NEW_BRANCH$BIRD_UI_VERSION"
   else
-    echo "MASTODON_VERSION_METADATA=\"+$NEW_BRANCH\"" >> .env.production
-    print_success "Version metadata added to .env.production: +$NEW_BRANCH"
+    echo "MASTODON_VERSION_METADATA='$NEW_BRANCH$BIRD_UI_VERSION'" >> .env.production
+    print_success "Version metadata added: $NEW_BRANCH$BIRD_UI_VERSION"
+  fi
+  
+  # Update GITHUB_REPOSITORY for comparison link
+  GITHUB_COMPARE="mastodon/mastodon/compare/main...${YOUR_FORK_REPO:-mementomori-social/mastodon}:$NEW_BRANCH"
+  if grep -q "^GITHUB_REPOSITORY=" .env.production; then
+    sed -i "s|^GITHUB_REPOSITORY=.*|GITHUB_REPOSITORY=$GITHUB_COMPARE|" .env.production
+    print_success "GitHub repository comparison updated"
+  else
+    echo "GITHUB_REPOSITORY=$GITHUB_COMPARE" >> .env.production
+    print_success "GitHub repository comparison added"
   fi
 else
   print_warning ".env.production not found, skipping version update"
