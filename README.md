@@ -110,7 +110,7 @@ If not using a `.env` file, you can edit the scripts directly to customize:
 #### Local environment settings
 - `MASTODON_DIR="/opt/mastodon"` - Your Mastodon installation directory
 - `API_URL="https://your-instance.com/api/v1/instance"` - Your instance API URL
-- `GITHUB_REPO="your-org/mastodon"` - Your fork repository
+- `YOUR_FORK_REPO="your-org/mastodon"` - Your fork repository
 
 #### Production environment settings
 - `PRODUCTION_MASTODON_DIR="/home/mastodon/live"` - Production Mastodon directory
@@ -152,7 +152,7 @@ To adapt for your instance:
 
 1. Update the organization/fork references:
 ```bash
-GITHUB_REPO="your-org/mastodon"
+YOUR_FORK_REPO="your-org/mastodon"
 ```
 
 2. Modify the git remote detection pattern:

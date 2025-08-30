@@ -24,8 +24,8 @@ fi
 # Default configuration (can be overridden by .env)
 MASTODON_DIR="${MASTODON_DIR:-/opt/mastodon}"
 MASTODON_USER="${MASTODON_USER:-mastodon}"
-GITHUB_REPO="${GITHUB_REPO:-your-org/mastodon}"
-UPSTREAM_REPO="${UPSTREAM_REPO:-mastodon/mastodon}"
+YOUR_FORK_REPO="${YOUR_FORK_REPO:-${GITHUB_REPO:-your-org/mastodon}}"
+OFFICIAL_MASTODON_REPO="${OFFICIAL_MASTODON_REPO:-${UPSTREAM_REPO:-mastodon/mastodon}}"
 API_URL="${API_URL:-https://your-instance.com/api/v1/instance}"
 UPGRADE_LOG="${UPGRADE_LOG:-$HOME/mastodon-upgrades.log}"
 NODE_VERSION="${NODE_VERSION:-22.18.0}"
@@ -216,10 +216,10 @@ git fetch $UPSTREAM_REMOTE main --quiet
 COMMITS_BEHIND=$(git rev-list --count HEAD..$UPSTREAM_REMOTE/main 2>/dev/null || echo "0")
 ORIGINAL_COMMITS_BEHIND=$COMMITS_BEHIND  # Save for documentation
 if [[ "$COMMITS_BEHIND" -gt 0 ]]; then
-  print_warning "Your fork is $COMMITS_BEHIND commits behind $UPSTREAM_REPO:main"
+  print_warning "Your fork is $COMMITS_BEHIND commits behind $OFFICIAL_MASTODON_REPO:main"
   echo "This information will be saved for documentation purposes"
 else
-  print_success "Your fork is up to date with $UPSTREAM_REPO:main"
+  print_success "Your fork is up to date with $OFFICIAL_MASTODON_REPO:main"
 fi
 
 # Step 2-3: GitHub sync via CLI
@@ -236,7 +236,7 @@ if command -v gh &> /dev/null; then
   fi
   
   print_info "Syncing fork via GitHub CLI..."
-  if gh repo sync "$GITHUB_REPO" --source "$UPSTREAM_REPO"; then
+  if gh repo sync "$YOUR_FORK_REPO" --source "$OFFICIAL_MASTODON_REPO"; then
     print_success "Fork synced successfully"
   else
     print_error "Fork sync failed"
@@ -271,7 +271,7 @@ else
   else
     print_warning "Please sync manually:"
     echo "1. Go to https://github.com/$GITHUB_REPO/tree/main"
-    echo "2. Verify: Your branch is $COMMITS_BEHIND commits behind $UPSTREAM_REPO:main"
+    echo "2. Verify: Your branch is $COMMITS_BEHIND commits behind $OFFICIAL_MASTODON_REPO:main"
     echo "3. Click 'Sync fork' to sync with upstream main"
     prompt_action "Manual GitHub sync completed"
   fi
@@ -301,7 +301,7 @@ if [[ -n "$LATEST_STABLE" ]]; then
     MAIN_COMMIT_DATE=$(git log -1 --pretty=format:"%cr" HEAD)
     print_success "Latest main commit: $MAIN_COMMIT_HASH - $MAIN_COMMIT_MSG"
     print_info "  Date: $MAIN_COMMIT_DATE"
-    print_info "  Link: https://github.com/$UPSTREAM_REPO/commit/$MAIN_COMMIT_HASH"
+    print_info "  Link: https://github.com/$OFFICIAL_MASTODON_REPO/commit/$MAIN_COMMIT_HASH"
   else
     print_info "Checking out stable version $LATEST_STABLE..."
     yarn cache clean
@@ -323,7 +323,7 @@ else
     MAIN_COMMIT_DATE=$(git log -1 --pretty=format:"%cr" HEAD)
     print_success "Latest main commit: $MAIN_COMMIT_HASH - $MAIN_COMMIT_MSG"
     print_info "  Date: $MAIN_COMMIT_DATE"
-    print_info "  Link: https://github.com/$UPSTREAM_REPO/commit/$MAIN_COMMIT_HASH"
+    print_info "  Link: https://github.com/$OFFICIAL_MASTODON_REPO/commit/$MAIN_COMMIT_HASH"
   else
     read -p "Enter the version tag (e.g., v4.4.0): " VERSION_TAG
     print_info "Checking out $VERSION_TAG..."
@@ -554,5 +554,5 @@ print_info "  Previous branch: $CURRENT_VERSION"
 print_warning "  Commits behind upstream (before sync): $ORIGINAL_COMMITS_BEHIND"
 print_info "  Next step: Run production upgrade script at $SCRIPTS_DIR/mastodon-upgrade-production.sh"
 echo
-print_info "Documentation note: This branch was $ORIGINAL_COMMITS_BEHIND commits behind $UPSTREAM_REPO:main"
+print_info "Documentation note: This branch was $ORIGINAL_COMMITS_BEHIND commits behind $OFFICIAL_MASTODON_REPO:main"
 print_info "Upgrade history saved to: $UPGRADE_LOG"

@@ -25,8 +25,8 @@ fi
 # Default configuration (can be overridden by .env)
 MASTODON_DIR="${MASTODON_DIR:-/opt/mastodon}"
 MASTODON_USER="${MASTODON_USER:-mastodon}"
-GITHUB_REPO="${GITHUB_REPO:-your-org/mastodon}"
-UPSTREAM_REPO="${UPSTREAM_REPO:-mastodon/mastodon}"
+YOUR_FORK_REPO="${YOUR_FORK_REPO:-${GITHUB_REPO:-your-org/mastodon}}"
+OFFICIAL_MASTODON_REPO="${OFFICIAL_MASTODON_REPO:-${UPSTREAM_REPO:-mastodon/mastodon}}"
 
 # Function to print colored messages
 print_info() {
@@ -182,7 +182,7 @@ if confirm "Commit and push changes to git?"; then
   git add app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
   
   print_info "Committing changes..."
-  git commit -m "Update to Mastodon Bird UI $BIRD_UI_VERSION ($BRANCH branch)"
+  git commit --no-verify -m "Update to Mastodon Bird UI $BIRD_UI_VERSION ($BRANCH branch)"
   
   print_info "Pushing to origin..."
   git push
@@ -221,7 +221,3 @@ print_info "SUMMARY:"
 print_success "  Bird UI version: $BIRD_UI_VERSION ($BRANCH branch)"
 print_success "  OS detected: $OS_TYPE"
 print_info "  Files updated: layout-single-column.scss, layout-multiple-columns.scss"
-
-if [[ "$BRANCH" == "nightly" ]]; then
-  print_warning "  Note: Using nightly/RC version - may contain experimental features"
-fi

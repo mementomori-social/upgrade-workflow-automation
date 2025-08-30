@@ -30,6 +30,10 @@ DB_USER="${DB_USER}"
 BACKUP_DIR="${BACKUP_DIR:-/tmp/mastodon-backups}"
 API_URL="${API_URL:-https://your-instance.com/api/v1/instance}"
 
+# Support both old and new variable names for backward compatibility
+YOUR_FORK_REPO="${YOUR_FORK_REPO:-${GITHUB_REPO}}"
+OFFICIAL_MASTODON_REPO="${OFFICIAL_MASTODON_REPO:-${UPSTREAM_REPO:-mastodon/mastodon}}"
+
 # Validate required environment variables
 if [[ -z "$DB_HOST" ]]; then
   print_error "DB_HOST not set. Please configure in .env file."
@@ -170,8 +174,8 @@ ORIGIN_REMOTE=""
 # Parse git remote -v output
 while read -r remote url type; do
   if [[ "$type" == "(fetch)" ]]; then
-    # Extract org/repo from configured GITHUB_REPO
-    if [[ -n "$GITHUB_REPO" && "$url" =~ $GITHUB_REPO ]]; then
+    # Extract org/repo from configured YOUR_FORK_REPO
+    if [[ -n "$YOUR_FORK_REPO" && "$url" =~ $YOUR_FORK_REPO ]]; then
       UPSTREAM_REMOTE="$remote"
       print_info "Found your fork remote: $remote -> $url"
     elif [[ "$url" =~ mastodon/mastodon ]] || [[ "$url" =~ tootsuite/mastodon ]]; then
@@ -184,7 +188,7 @@ done < <(git remote -v)
 
 # Validate remotes
 if [[ -z "$UPSTREAM_REMOTE" ]]; then
-  print_error "Could not find remote for your fork (check GITHUB_REPO in .env)"
+  print_error "Could not find remote for your fork (check YOUR_FORK_REPO in .env)"
   read -p "Enter the remote name for your fork: " UPSTREAM_REMOTE
 fi
 
