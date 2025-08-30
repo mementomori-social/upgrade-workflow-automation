@@ -1,11 +1,13 @@
 # Mastodon upgrade workflow automation
 
-![Version](https://img.shields.io/badge/version-1.0.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.0.2-blue?style=for-the-badge)
 ![Mastodon](https://img.shields.io/badge/-MASTODON-%236364FF?style=for-the-badge&logo=mastodon&logoColor=white)
 ![bash](https://img.shields.io/badge/bash-%23121011.svg?style=for-the-badge&color=%23222222&logo=gnu-bash&logoColor=white)
 ![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 
 Automated bash scripts for managing Mastodon instance upgrades, designed for the mementomori.social workflow but adaptable to other instances.
+
+<img width="884" height="516" alt="image" src="https://github.com/user-attachments/assets/a52f2311-b0ad-43da-89ff-69bcb0daa927" />
 
 ## Features
 
