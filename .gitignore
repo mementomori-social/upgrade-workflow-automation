@@ -1,5 +1,7 @@
 # Environment configuration (contains sensitive info)
 .env
+.env.development
+.env.production
 
 # Log files
 *.log

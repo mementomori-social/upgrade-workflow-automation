@@ -2,6 +2,7 @@
 
 # Mastodon Production Upgrade Script
 # This script automates the Mastodon upgrade process for the production environment
+# Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.1")
 
 set -e  # Exit on error
 
@@ -12,9 +13,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Load configuration from .env file if it exists
+# Load configuration from .env files if they exist
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$SCRIPT_DIR/.env" ]]; then
+if [[ -f "$SCRIPT_DIR/.env.production" ]]; then
+  source "$SCRIPT_DIR/.env.production"
+elif [[ -f "$SCRIPT_DIR/.env" ]]; then
   source "$SCRIPT_DIR/.env"
 fi
 
@@ -73,6 +76,12 @@ confirm() {
   [[ $REPLY =~ ^[Yy]$ ]]
 }
 
+# Get version and date from changelog
+SCRIPT_VERSION_LINE=$(head -n1 "$SCRIPT_DIR/CHANGELOG.md" 2>/dev/null || echo "### 1.0.1: 2025-08-30")
+SCRIPT_VERSION=$(echo "$SCRIPT_VERSION_LINE" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.1")
+SCRIPT_DATE=$(echo "$SCRIPT_VERSION_LINE" | grep -o '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' || echo "2025-08-30")
+
+print_info "Mastodon production upgrade script ${BLUE}v$SCRIPT_VERSION ($SCRIPT_DATE)${NC}"
 print_info "Starting Mastodon PRODUCTION upgrade process"
 echo "================================================"
 print_warning "THIS WILL AFFECT THE LIVE PRODUCTION INSTANCE!"
