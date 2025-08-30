@@ -90,8 +90,16 @@ echo "1. Create Mastodon announcement:"
 echo "   URL: $INSTANCE_URL/admin/announcements/new"
 echo "   Message: We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience. Status: $STATUS_URL"
 echo
+# Calculate maintenance window (current time + 2 hours)
+MAINTENANCE_START=$(date "+%m/%d/%Y %I:%M %p")
+MAINTENANCE_END=$(date -d "+2 hours" "+%m/%d/%Y %I:%M %p")
+TIMEZONE=$(date +"%Z")
+
 echo "2. Create maintenance window:"
 echo "   URL: $MAINTENANCE_URL"
+echo "   Title: Server maintenance"
+echo "   From: $MAINTENANCE_START $TIMEZONE"
+echo "   To: $MAINTENANCE_END $TIMEZONE"
 echo "   Message: We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience."
 echo
 prompt_action "Announcements created"
