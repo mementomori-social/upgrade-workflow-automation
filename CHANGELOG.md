@@ -6,6 +6,7 @@
 * Remove unnecessary nightly version warning from Bird UI script
 * Improve environment variable documentation with clearer descriptions
 * Add automatic remote detection based on repository URLs instead of remote names
+* Fix production script to detect git remotes before attempting branch detection
 
 ### 1.0.1: 2025-08-30
 

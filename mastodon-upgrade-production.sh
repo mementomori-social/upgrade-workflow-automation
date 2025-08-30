@@ -116,6 +116,38 @@ if ! confirm "Are you sure you want to continue with the production upgrade?"; t
   exit 0
 fi
 
+# Change to Mastodon directory first to detect remotes
+cd "$MASTODON_DIR"
+print_success "Changed to directory: $MASTODON_DIR"
+
+# Auto-detect git remotes
+print_info "Detecting git remotes..."
+UPSTREAM_REMOTE=""
+ORIGIN_REMOTE=""
+
+# Parse git remote -v output
+while read -r remote url type; do
+  if [[ "$type" == "(fetch)" ]]; then
+    # Extract org/repo from configured YOUR_FORK_REPO
+    if [[ -n "$YOUR_FORK_REPO" && "$url" =~ $YOUR_FORK_REPO ]]; then
+      UPSTREAM_REMOTE="$remote"
+      print_info "Found your fork remote: $remote -> $url"
+    elif [[ "$url" =~ mastodon/mastodon ]] || [[ "$url" =~ tootsuite/mastodon ]]; then
+      # In production, this is just for reference
+      ORIGIN_REMOTE="$remote"
+      print_info "Found original mastodon remote: $remote -> $url"
+    fi
+  fi
+done < <(git remote -v)
+
+# Validate remotes
+if [[ -z "$UPSTREAM_REMOTE" ]]; then
+  print_error "Could not find remote for your fork (check YOUR_FORK_REPO in .env)"
+  read -p "Enter the remote name for your fork: " UPSTREAM_REMOTE
+fi
+
+print_success "Using remote for your fork: $UPSTREAM_REMOTE"
+
 # Auto-detect newest mementomods branch from development
 print_info "Detecting newest mementomods branch from $UPSTREAM_REMOTE..."
 git fetch $UPSTREAM_REMOTE --quiet
@@ -162,37 +194,6 @@ if [[ "$USER" != "$MASTODON_USER" ]]; then
   exit 1
 fi
 
-# Change to Mastodon directory
-cd "$MASTODON_DIR"
-print_success "Changed to directory: $MASTODON_DIR"
-
-# Auto-detect git remotes
-print_info "Detecting git remotes..."
-UPSTREAM_REMOTE=""
-ORIGIN_REMOTE=""
-
-# Parse git remote -v output
-while read -r remote url type; do
-  if [[ "$type" == "(fetch)" ]]; then
-    # Extract org/repo from configured YOUR_FORK_REPO
-    if [[ -n "$YOUR_FORK_REPO" && "$url" =~ $YOUR_FORK_REPO ]]; then
-      UPSTREAM_REMOTE="$remote"
-      print_info "Found your fork remote: $remote -> $url"
-    elif [[ "$url" =~ mastodon/mastodon ]] || [[ "$url" =~ tootsuite/mastodon ]]; then
-      # In production, this is just for reference
-      ORIGIN_REMOTE="$remote"
-      print_info "Found original mastodon remote: $remote -> $url"
-    fi
-  fi
-done < <(git remote -v)
-
-# Validate remotes
-if [[ -z "$UPSTREAM_REMOTE" ]]; then
-  print_error "Could not find remote for your fork (check YOUR_FORK_REPO in .env)"
-  read -p "Enter the remote name for your fork: " UPSTREAM_REMOTE
-fi
-
-print_success "Using remote for your fork: $UPSTREAM_REMOTE"
 
 # Step 2: Fetch changes
 print_info "Fetching changes from $UPSTREAM_REMOTE..."
