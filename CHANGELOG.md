@@ -7,6 +7,9 @@
 * Improve environment variable documentation with clearer descriptions
 * Add automatic remote detection based on repository URLs instead of remote names
 * Fix production script to detect git remotes before attempting branch detection
+* Add automatic update of MASTODON_VERSION_METADATA and GITHUB_REPOSITORY in both scripts
+* Remove search index prompts from production script, add as optional recommendations instead
+* Fix production script to use restart instead of stop/start to minimize downtime
 
 ### 1.0.1: 2025-08-30
 
