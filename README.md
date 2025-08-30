@@ -7,7 +7,7 @@
 
 Automated bash scripts for managing Mastodon instance upgrades, designed for the mementomori.social workflow but adaptable to other instances.
 
-<img width="884" height="516" alt="image" src="https://github.com/user-attachments/assets/a52f2311-b0ad-43da-89ff-69bcb0daa927" />
+<img width="829" height="516" alt="image" src="https://github.com/user-attachments/assets/ca087d38-99eb-4857-b548-8d2b5b2a6d8b" />
 
 ## Features
 
