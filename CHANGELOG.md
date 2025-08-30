@@ -2,6 +2,7 @@
 
 * Split environment configuration into development and production files following Mastodon conventions
 * Add version headers to scripts
+* Add mastodon-bird-ui-update.sh script
 
 ### 1.0.0: 2025-08-30
 
