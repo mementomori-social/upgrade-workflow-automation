@@ -6,6 +6,16 @@
 
 set -e  # Exit on error
 
+# Check if running as root (prevent sudo execution)
+if [[ "$EUID" -eq 0 ]]; then
+  echo "ERROR: This script should not be run as root or with sudo"
+  echo "Please run as the mastodon user:"
+  echo "  su - mastodon"
+  echo "  cd ~/upgrade-workflow-automation"
+  echo "  bash $(basename "$0")"
+  exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -211,12 +221,6 @@ echo
 print_warning "This may take 30+ minutes and cause slowness"
 prompt_action "Database backup completed"
 
-# Check if running as mastodon user
-if [[ "$USER" != "$MASTODON_USER" ]]; then
-  print_warning "Please run this script as the mastodon user on the production server"
-  echo "sudo su - mastodon"
-  exit 1
-fi
 
 
 # Step 2: Fetch changes

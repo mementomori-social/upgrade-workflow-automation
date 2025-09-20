@@ -29,13 +29,29 @@ cd ~/upgrade-workflow-automation
 bash mastodon-upgrade-local.sh
 ```
 
-After testing and verification, deploy to production:
+After testing and verification, SSH to your production server and deploy:
+
+```bash
+ssh your-production-server
+```
+
+```bash
+sudo su mastodon
+```
+
+```bash
+cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git)
+```
+
+```bash
+cd ~/upgrade-workflow-automation
+```
 
 ```bash
 bash mastodon-upgrade-production.sh
 ```
 
-Optional: Update Mastodon Bird UI if you use it:
+Optional: Update Mastodon Bird UI if there are new changes:
 
 ```bash
 bash mastodon-bird-ui-update.sh
