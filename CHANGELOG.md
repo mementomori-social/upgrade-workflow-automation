@@ -9,6 +9,9 @@
 * Add quick upgrade workflow section to README with idempotent git commands
 * Move database backup prompt to very beginning of local script for time efficiency
 * Improve upgrade summary formatting and hide zero commit counts
+* Add root/sudo execution prevention with colored error messages
+* Fix Bird UI script permission issues by using temp files for downloads
+* Clarify production deployment workflow in README with explicit SSH steps
 
 ### 1.0.2: 2025-08-30
 
