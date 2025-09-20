@@ -7,10 +7,15 @@
 
 set -e  # Exit on error
 
+# Basic colors for early error messages
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
 # Check if running as root (prevent sudo execution)
 if [[ "$EUID" -eq 0 ]]; then
-  echo "ERROR: This script should not be run as root or with sudo"
-  echo "Please run as the mastodon user:"
+  echo -e "${RED}ERROR:${NC} This script should not be run as root or with sudo"
+  echo -e "${YELLOW}Please run as the mastodon user:${NC}"
   echo "  su - mastodon"
   echo "  cd ~/upgrade-workflow-automation"
   echo "  bash $(basename "$0")"
