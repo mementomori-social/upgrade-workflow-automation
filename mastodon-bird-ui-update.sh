@@ -118,28 +118,44 @@ else
   print_info "Using stable version"
 fi
 
-# Download and process CSS files
-print_info "Downloading Mastodon Bird UI CSS files..."
-
-# Download single column layout
-print_info "Downloading single column layout..."
-if wget -N --no-check-certificate --no-cache --no-cookies --no-http-keep-alive \
-  "https://raw.githubusercontent.com/ronilaukkarinen/mastodon-bird-ui/$BRANCH/layout-single-column.css" \
-  -O app/javascript/styles/mastodon-bird-ui/layout-single-column.scss; then
-  print_success "Single column layout downloaded"
-else
-  print_error "Failed to download single column layout"
+# Check write permissions
+if [[ ! -w "app/javascript/styles/mastodon-bird-ui" ]]; then
+  print_error "No write permission to app/javascript/styles/mastodon-bird-ui"
+  print_info "Please check file ownership. Current user: $USER"
+  print_info "Directory owner: $(stat -c '%U' app/javascript/styles/mastodon-bird-ui 2>/dev/null || echo 'unknown')"
+  print_info "You may need to run:"
+  echo "  sudo chown -R $USER:$USER app/javascript/styles/mastodon-bird-ui"
   exit 1
 fi
 
-# Download multiple column layout
+# Download and process CSS files
+print_info "Downloading Mastodon Bird UI CSS files..."
+
+# Download single column layout using temp file approach
+print_info "Downloading single column layout..."
+TEMP_FILE="/tmp/bird-ui-single-column-$$.css"
+if wget --no-check-certificate --no-cache --no-cookies --no-http-keep-alive \
+  "https://raw.githubusercontent.com/ronilaukkarinen/mastodon-bird-ui/$BRANCH/layout-single-column.css" \
+  -O "$TEMP_FILE"; then
+  mv "$TEMP_FILE" app/javascript/styles/mastodon-bird-ui/layout-single-column.scss
+  print_success "Single column layout downloaded"
+else
+  print_error "Failed to download single column layout"
+  rm -f "$TEMP_FILE"
+  exit 1
+fi
+
+# Download multiple column layout using temp file approach
 print_info "Downloading multiple column layout..."
-if wget -N --no-check-certificate --no-cache --no-cookies --no-http-keep-alive \
+TEMP_FILE="/tmp/bird-ui-multiple-columns-$$.css"
+if wget --no-check-certificate --no-cache --no-cookies --no-http-keep-alive \
   "https://raw.githubusercontent.com/ronilaukkarinen/mastodon-bird-ui/$BRANCH/layout-multiple-columns.css" \
-  -O app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss; then
+  -O "$TEMP_FILE"; then
+  mv "$TEMP_FILE" app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
   print_success "Multiple column layout downloaded"
 else
   print_error "Failed to download multiple column layout"
+  rm -f "$TEMP_FILE"
   exit 1
 fi
 
