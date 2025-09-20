@@ -2,7 +2,7 @@
 
 # Mastodon Local Development Upgrade Script
 # This script automates the Mastodon upgrade process for the development environment
-# Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.1")
+# Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.3")
 
 set -e  # Exit on error
 
@@ -55,11 +55,7 @@ print_error() {
 # Function to prompt for user action
 prompt_action() {
   echo -e "${YELLOW}[ACTION REQUIRED]${NC} $1"
-  read -p "Press Enter when done, or type 'skip' to skip: " response
-  if [[ "$response" == "skip" ]]; then
-    print_warning "Skipped: $1"
-    return 1
-  fi
+  read -p "Press Enter when done: " response
   return 0
 }
 
@@ -91,13 +87,36 @@ SCRIPT_DATE=$(echo "$SCRIPT_VERSION_LINE" | grep -o '[0-9]\{4\}-[0-9]\{2\}-[0-9]
 print_info "Mastodon local development upgrade script ${BLUE}v$SCRIPT_VERSION ($SCRIPT_DATE)${NC}"
 print_info "Starting upgrade process for local development environment"
 
-# Step 0: Create maintenance announcements
+# Step 0: Database backup (FIRST - takes longest)
+echo
+print_warning "FIRST: Start database backup now (takes 30+ minutes)"
+echo
+echo "To create a backup, run these commands on the database server:"
+echo
+echo "ssh -p ${DB_PORT:-5432} ${DB_USER:-your-db-user}@${DB_HOST:-your.db.server.ip}"
+echo "sudo su -"
+echo "ionice -c2 -n7 nice -n19 pg_dump \\"
+echo "  --host=localhost \\"
+echo "  --username=mastodon \\"
+echo "  --port=5432 \\"
+echo "  --format=custom \\"
+echo "  --no-owner \\"
+echo "  --compress=5 \\"
+echo "  --verbose \\"
+echo "  --file=\"${BACKUP_DIR:-/tmp/mastodon-backups}/mastodon_production_\$(date +%Y-%m-%d_%H-%M).backup\""
+echo
+print_warning "This may take 30+ minutes and cause slowness"
+print_info "Start this backup now, then continue with the script"
+prompt_action "Database backup started"
+
+# Step 1: Create maintenance announcements
 echo
 print_warning "FIRST: Create maintenance announcements"
 echo
 echo "1. Create Mastodon announcement:"
 echo "   URL: $INSTANCE_URL/admin/announcements/new"
-echo "   Message: We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience. Status: $STATUS_URL"
+echo "   Message:"
+echo "We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience. Status: $STATUS_URL"
 echo
 # Calculate maintenance window (current time + 2 hours)
 MAINTENANCE_START=$(date "+%m/%d/%Y %I:%M %p")
@@ -109,7 +128,8 @@ echo "   URL: $MAINTENANCE_URL"
 echo "   Title: Server maintenance"
 echo "   From: $MAINTENANCE_START $TIMEZONE"
 echo "   To: $MAINTENANCE_END $TIMEZONE"
-echo "   Message: We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience."
+echo "   Message:"
+echo "We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience."
 echo
 prompt_action "Announcements created"
 
@@ -186,8 +206,8 @@ UPSTREAM_REMOTE=""
 # Parse git remote -v output
 while read -r remote url type; do
   if [[ "$type" == "(fetch)" ]]; then
-    # Extract org/repo from configured GITHUB_REPO
-    if [[ -n "$GITHUB_REPO" && "$url" =~ $GITHUB_REPO ]]; then
+    # Extract org/repo from configured YOUR_FORK_REPO
+    if [[ -n "$YOUR_FORK_REPO" && "$url" =~ $YOUR_FORK_REPO ]]; then
       ORIGIN_REMOTE="$remote"
       print_info "Found your fork remote: $remote -> $url"
     elif [[ "$url" =~ mastodon/mastodon ]] || [[ "$url" =~ tootsuite/mastodon ]]; then
@@ -199,7 +219,7 @@ done < <(git remote -v)
 
 # Validate remotes
 if [[ -z "$ORIGIN_REMOTE" ]]; then
-  print_error "Could not find remote for your fork (check GITHUB_REPO in .env)"
+  print_error "Could not find remote for your fork (check YOUR_FORK_REPO in .env)"
   read -p "Enter the remote name for your fork: " ORIGIN_REMOTE
 fi
 
@@ -340,10 +360,22 @@ if [[ -f ".ruby-version" ]]; then
   REQUIRED_RUBY=$(cat .ruby-version)
   print_info "Required Ruby version: $REQUIRED_RUBY"
   if ! rbenv versions | grep -q "$REQUIRED_RUBY"; then
-    if confirm "Ruby $REQUIRED_RUBY is not installed. Install it?"; then
-      rbenv install "$REQUIRED_RUBY"
-      print_success "Ruby $REQUIRED_RUBY installed"
+    print_warning "Ruby $REQUIRED_RUBY is not installed"
+    print_info "Updating ruby-build definitions..."
+    git -C ~/.rbenv/plugins/ruby-build pull || print_warning "Could not update ruby-build (continuing anyway)"
+    
+    if confirm "Install Ruby $REQUIRED_RUBY?"; then
+      if rbenv install "$REQUIRED_RUBY"; then
+        print_success "Ruby $REQUIRED_RUBY installed"
+      else
+        print_error "Failed to install Ruby $REQUIRED_RUBY"
+        print_warning "Continuing with current Ruby version, but build may fail"
+      fi
+    else
+      print_warning "Continuing with current Ruby version, but build may fail"
     fi
+  else
+    print_success "Ruby $REQUIRED_RUBY is already installed"
   fi
 fi
 
@@ -568,8 +600,11 @@ print_success "Local development upgrade completed!"
 print_info "UPGRADE SUMMARY:"
 print_success "  New branch: $NEW_BRANCH"
 print_info "  Previous branch: $CURRENT_VERSION"
-print_warning "  Commits behind upstream (before sync): $ORIGINAL_COMMITS_BEHIND"
-print_info "  Next step: Run production upgrade script at $SCRIPTS_DIR/mastodon-upgrade-production.sh"
+if [[ "$ORIGINAL_COMMITS_BEHIND" -gt 0 ]]; then
+  print_warning "  Commits synced: $ORIGINAL_COMMITS_BEHIND from upstream"
+else
+  print_success "  Fork was up to date with upstream"
+fi
+print_info "  Next step: Run production upgrade script"
 echo
-print_info "Documentation note: This branch was $ORIGINAL_COMMITS_BEHIND commits behind $OFFICIAL_MASTODON_REPO:main"
 print_info "Upgrade history saved to: $UPGRADE_LOG"

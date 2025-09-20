@@ -1,6 +1,6 @@
 # Mastodon upgrade workflow automation
 
-![Version](https://img.shields.io/badge/version-1.0.2-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.0.3-blue?style=for-the-badge)
 ![Mastodon](https://img.shields.io/badge/-MASTODON-%236364FF?style=for-the-badge&logo=mastodon&logoColor=white)
 ![bash](https://img.shields.io/badge/bash-%23121011.svg?style=for-the-badge&color=%23222222&logo=gnu-bash&logoColor=white)
 ![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
@@ -8,6 +8,38 @@
 Automated bash scripts for managing Mastodon instance upgrades, designed for the mementomori.social workflow but adaptable to other instances.
 
 <img width="829" height="516" alt="image" src="https://github.com/user-attachments/assets/ca087d38-99eb-4857-b548-8d2b5b2a6d8b" />
+
+## When it's upgrade day - Test and upgrade workflow with [the scripts](https://github.com/mementomori-social/upgrade-workflow-automation)
+
+You don't even have to create announcement and status page update manually, the script will prompt about it.
+
+```bash
+sudo su mastodon
+```
+
+```bash
+cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git)
+```
+
+```bash
+cd ~/upgrade-workflow-automation
+```
+
+```bash
+bash mastodon-upgrade-local.sh
+```
+
+After testing and verification, deploy to production:
+
+```bash
+bash mastodon-upgrade-production.sh
+```
+
+Optional: Update Mastodon Bird UI if you use it:
+
+```bash
+bash mastodon-bird-ui-update.sh
+```
 
 ## Features
 

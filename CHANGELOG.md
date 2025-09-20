@@ -1,3 +1,15 @@
+### 1.0.3: 2025-09-20
+
+* Add maintenance message templates to production script for easy copy-paste
+* Fix local script remote detection to use correct variable name
+* Improve Ruby version handling to auto-update ruby-build and continue on failure
+* Remove unnecessary 'skip' option from action prompts
+* Make maintenance announcement formatting consistent between local and production scripts
+* Improve message formatting for easy copy-paste without leading spaces
+* Add quick upgrade workflow section to README with idempotent git commands
+* Move database backup prompt to very beginning of local script for time efficiency
+* Improve upgrade summary formatting and hide zero commit counts
+
 ### 1.0.2: 2025-08-30
 
 * Rename environment variables for clarity: GITHUB_REPO → YOUR_FORK_REPO, UPSTREAM_REPO → OFFICIAL_MASTODON_REPO

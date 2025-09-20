@@ -3,7 +3,7 @@
 # Gets the latest mastodon-bird-ui from https://github.com/ronilaukkarinen/mastodon-bird-ui and applies it to use on your supported Mastodon fork.
 
 # This script automates the Mastodon Bird UI update process for local development
-# Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.1")
+# Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.3")
 
 set -e  # Exit on error
 
