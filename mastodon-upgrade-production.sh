@@ -2,7 +2,7 @@
 
 # Mastodon Production Upgrade Script
 # This script automates the Mastodon upgrade process for the production environment
-# Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.1")
+# Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.3")
 
 set -e  # Exit on error
 
@@ -65,12 +65,33 @@ print_error() {
 # Function to prompt for user action
 prompt_action() {
   echo -e "${YELLOW}[ACTION REQUIRED]${NC} $1"
-  read -p "Press Enter when done, or type 'skip' to skip: " response
-  if [[ "$response" == "skip" ]]; then
-    print_warning "Skipped: $1"
-    return 1
-  fi
+  read -p "Press Enter when done: " response
   return 0
+}
+
+# Function to show maintenance messages
+show_maintenance_messages() {
+  echo
+  print_warning "FIRST: Create maintenance announcements (skip if already done in local script)"
+  echo
+  echo "1. Create Mastodon announcement:"
+  echo "   URL: ${INSTANCE_URL:-https://mementomori.social}/admin/announcements/new"
+  echo "   Message:"
+  echo "We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience. Status: ${STATUS_URL:-https://status.mementomori.social}"
+  echo
+  # Calculate maintenance window (current time + 2 hours)
+  MAINTENANCE_START=$(date "+%m/%d/%Y %I:%M %p")
+  MAINTENANCE_END=$(date -d "+2 hours" "+%m/%d/%Y %I:%M %p")
+  TIMEZONE=$(date +"%Z")
+  
+  echo "2. Create maintenance window:"
+  echo "   URL: ${MAINTENANCE_URL:-https://uptime.betterstack.com/team/t5969/status-pages/165860/maintenances}"
+  echo "   Title: Server maintenance"
+  echo "   From: $MAINTENANCE_START $TIMEZONE"
+  echo "   To: $MAINTENANCE_END $TIMEZONE"
+  echo "   Message:"
+  echo "We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience."
+  echo
 }
 
 # Function to prompt for confirmation
@@ -110,6 +131,9 @@ if [[ $SERVICE_CHECK -ne 0 ]]; then
     exit 0
   fi
 fi
+
+# Show maintenance messages for copy-paste
+show_maintenance_messages
 
 if ! confirm "Are you sure you want to continue with the production upgrade?"; then
   print_info "Upgrade cancelled"
@@ -169,7 +193,7 @@ else
 fi
 
 # Step 1: Database backup
-print_warning "Database backup is required before proceeding"
+print_warning "Database backup is required before proceeding (may already be running from local script)"
 echo "To create a backup, run these commands on the database server:"
 echo
 echo "ssh -p $DB_PORT $DB_USER@$DB_HOST"
@@ -248,14 +272,27 @@ else
 fi
 
 # Check Ruby version
+print_info "Checking Ruby version requirements..."
 if [[ -f ".ruby-version" ]]; then
   REQUIRED_RUBY=$(cat .ruby-version)
   print_info "Required Ruby version: $REQUIRED_RUBY"
   if ! rbenv versions | grep -q "$REQUIRED_RUBY"; then
-    if confirm "Ruby $REQUIRED_RUBY is not installed. Install it?"; then
-      rbenv install "$REQUIRED_RUBY"
-      print_success "Ruby $REQUIRED_RUBY installed"
+    print_warning "Ruby $REQUIRED_RUBY is not installed"
+    print_info "Updating ruby-build definitions..."
+    git -C ~/.rbenv/plugins/ruby-build pull || print_warning "Could not update ruby-build (continuing anyway)"
+    
+    if confirm "Install Ruby $REQUIRED_RUBY?"; then
+      if rbenv install "$REQUIRED_RUBY"; then
+        print_success "Ruby $REQUIRED_RUBY installed"
+      else
+        print_error "Failed to install Ruby $REQUIRED_RUBY"
+        print_warning "Continuing with current Ruby version, but build may fail"
+      fi
+    else
+      print_warning "Continuing with current Ruby version, but build may fail"
     fi
+  else
+    print_success "Ruby $REQUIRED_RUBY is already installed"
   fi
 fi
 
