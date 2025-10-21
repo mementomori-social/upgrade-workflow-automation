@@ -509,6 +509,23 @@ else
   echo "Current Node.js version: $(node --version 2>/dev/null || echo 'not installed')"
 fi
 
+# Enable corepack for yarn
+print_info "Enabling corepack for yarn..."
+if command -v corepack &> /dev/null; then
+  corepack enable
+  print_success "Corepack enabled"
+else
+  print_warning "Corepack not found - attempting to enable via npm"
+  if command -v npm &> /dev/null; then
+    npm install -g corepack
+    corepack enable
+    print_success "Corepack installed and enabled"
+  else
+    print_error "Cannot enable corepack - npm not found"
+    exit 1
+  fi
+fi
+
 # Step 6: Build
 print_info "Installing dependencies and building assets..."
 
