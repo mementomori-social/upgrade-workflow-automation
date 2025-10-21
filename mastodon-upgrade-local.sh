@@ -78,9 +78,31 @@ prompt_action() {
 
 # Function to prompt for confirmation
 confirm() {
-  read -p "$1 (y/n): " -n 1 -r
-  echo
+  read -p "$1 (y/n): " -r
   [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+# Function to check for unstaged changes and offer to stash
+check_and_stash_changes() {
+  if ! git diff-files --quiet; then
+    print_warning "You have unstaged changes in your working directory:"
+    git status --short
+    echo
+    if confirm "Would you like to stash these changes?"; then
+      print_info "Stashing changes..."
+      git stash push -m "Auto-stash before upgrade on $(date '+%Y-%m-%d %H:%M:%S')"
+      print_success "Changes stashed successfully"
+      echo "To restore your changes later, run: git stash pop"
+      return 0
+    else
+      print_error "Cannot proceed with unstaged changes"
+      echo "Please either:"
+      echo "  1. Stash your changes: git stash"
+      echo "  2. Commit your changes: git add . && git commit"
+      echo "  3. Discard your changes: git checkout -- ."
+      exit 1
+    fi
+  fi
 }
 
 # Check if running as mastodon user
@@ -265,11 +287,16 @@ if command -v gh &> /dev/null; then
   # Check if GitHub CLI is authenticated
   if ! gh auth status &>/dev/null; then
     print_warning "GitHub CLI found but not authenticated"
-    echo -e "${BLUE}🔑 Please authenticate with GitHub CLI:${NC}"
-    echo "  gh auth login"
-    echo
-    echo "After authentication, restart this script to continue."
-    exit 0
+    echo -e "${BLUE}🔑 Starting authentication process...${NC}"
+    gh auth login
+
+    # Verify authentication succeeded
+    if ! gh auth status &>/dev/null; then
+      print_error "GitHub CLI authentication failed"
+      echo "Please run 'gh auth login' manually and then restart this script."
+      exit 1
+    fi
+    print_success "GitHub CLI authenticated successfully"
   fi
   
   print_info "Syncing fork via GitHub CLI..."
@@ -291,26 +318,82 @@ else
   print_warning "GitHub CLI not found. Installing..."
   if confirm "Install GitHub CLI automatically?"; then
     echo -e "${BLUE}📦 Installing GitHub CLI...${NC}"
-    if sudo apt update && sudo apt install -y gh; then
-      print_success "GitHub CLI installed successfully"
-      print_warning "You'll need to authenticate: gh auth login"
-      echo "Please run 'gh auth login' and then restart this script."
-      exit 0
+
+    # Detect package manager and install
+    if command -v pacman &> /dev/null; then
+      # Arch Linux
+      if sudo pacman -Sy --noconfirm github-cli; then
+        print_success "GitHub CLI installed successfully"
+      else
+        print_error "Failed to install GitHub CLI via pacman"
+        exit 1
+      fi
+    elif command -v apt &> /dev/null; then
+      # Debian/Ubuntu
+      if sudo apt update && sudo apt install -y gh; then
+        print_success "GitHub CLI installed successfully"
+      else
+        print_error "Failed to install GitHub CLI via apt"
+        exit 1
+      fi
+    elif command -v dnf &> /dev/null; then
+      # Fedora/RHEL
+      if sudo dnf install -y gh; then
+        print_success "GitHub CLI installed successfully"
+      else
+        print_error "Failed to install GitHub CLI via dnf"
+        exit 1
+      fi
+    elif command -v yum &> /dev/null; then
+      # CentOS/older RHEL
+      if sudo yum install -y gh; then
+        print_success "GitHub CLI installed successfully"
+      else
+        print_error "Failed to install GitHub CLI via yum"
+        exit 1
+      fi
+    elif command -v brew &> /dev/null; then
+      # macOS/Homebrew
+      if brew install gh; then
+        print_success "GitHub CLI installed successfully"
+      else
+        print_error "Failed to install GitHub CLI via brew"
+        exit 1
+      fi
     else
-      print_error "Failed to install GitHub CLI"
-      print_warning "Please install manually and sync fork:"
-      echo "1. sudo apt install gh"
-      echo "2. gh auth login"
-      echo "3. Go to https://github.com/$GITHUB_REPO/tree/main"
-      echo "4. Click 'Sync fork' to sync with upstream main"
-      prompt_action "Manual setup completed"
+      print_error "Unknown package manager"
+      print_error "Please install GitHub CLI manually for your distribution"
+      echo "Visit: https://github.com/cli/cli#installation"
+      exit 1
+    fi
+
+    # Check if already authenticated
+    if gh auth status &>/dev/null; then
+      print_success "GitHub CLI already authenticated"
+    else
+      print_warning "GitHub CLI needs authentication"
+      echo "Starting authentication process..."
+      gh auth login
+
+      # Verify authentication succeeded
+      if gh auth status &>/dev/null; then
+        print_success "GitHub CLI authenticated successfully"
+      else
+        print_error "GitHub CLI authentication failed"
+        echo "Please run 'gh auth login' manually and then restart this script."
+        exit 1
+      fi
     fi
   else
-    print_warning "Please sync manually:"
-    echo "1. Go to https://github.com/$GITHUB_REPO/tree/main"
-    echo "2. Verify: Your branch is $COMMITS_BEHIND commits behind $OFFICIAL_MASTODON_REPO:main"
-    echo "3. Click 'Sync fork' to sync with upstream main"
-    prompt_action "Manual GitHub sync completed"
+    print_error "GitHub CLI is required for fork synchronization"
+    echo "Please install it manually:"
+    echo "  - Arch: sudo pacman -S github-cli"
+    echo "  - Debian/Ubuntu: sudo apt install gh"
+    echo "  - Fedora: sudo dnf install gh"
+    echo "  - macOS: brew install gh"
+    echo ""
+    echo "Then authenticate: gh auth login"
+    exit 1
   fi
 fi
 
@@ -329,6 +412,7 @@ if [[ -n "$LATEST_STABLE" ]]; then
     print_info "Checking out and updating main branch..."
     git fetch --all
     yarn cache clean
+    check_and_stash_changes
     git checkout main
     git pull $UPSTREAM_REMOTE main
     
@@ -343,6 +427,7 @@ if [[ -n "$LATEST_STABLE" ]]; then
     print_info "Checking out stable version $LATEST_STABLE..."
     yarn cache clean
     git fetch
+    check_and_stash_changes
     git checkout "$LATEST_STABLE"
   fi
 else
@@ -351,9 +436,10 @@ else
     print_info "Checking out and updating main branch..."
     git fetch --all
     yarn cache clean
+    check_and_stash_changes
     git checkout main
     git pull $UPSTREAM_REMOTE main
-    
+
     # Show latest main commit info
     MAIN_COMMIT_HASH=$(git rev-parse --short HEAD)
     MAIN_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD)
@@ -366,6 +452,7 @@ else
     print_info "Checking out $VERSION_TAG..."
     yarn cache clean
     git fetch
+    check_and_stash_changes
     git checkout "$VERSION_TAG"
   fi
 fi
@@ -424,6 +511,22 @@ fi
 
 # Step 6: Build
 print_info "Installing dependencies and building assets..."
+
+# Check and install required bundler version
+if [[ -f "Gemfile.lock" ]]; then
+  REQUIRED_BUNDLER=$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d '[:space:]')
+  if [[ -n "$REQUIRED_BUNDLER" ]]; then
+    print_info "Checking bundler version (required: $REQUIRED_BUNDLER)..."
+    if ! gem list bundler -i -v "$REQUIRED_BUNDLER" &>/dev/null; then
+      print_warning "Installing bundler $REQUIRED_BUNDLER..."
+      gem install bundler -v "$REQUIRED_BUNDLER"
+      print_success "Bundler $REQUIRED_BUNDLER installed"
+    else
+      print_success "Bundler $REQUIRED_BUNDLER already installed"
+    fi
+  fi
+fi
+
 echo -e "${YELLOW}  ⏳ Running bundle install...${NC}"
 bundle install
 echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
@@ -577,6 +680,19 @@ fi
 print_info "Recompiling with new branch..."
 yarn cache clean
 rm -rf node_modules
+
+# Check and install required bundler version (in case it changed after merge)
+if [[ -f "Gemfile.lock" ]]; then
+  REQUIRED_BUNDLER=$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d '[:space:]')
+  if [[ -n "$REQUIRED_BUNDLER" ]]; then
+    if ! gem list bundler -i -v "$REQUIRED_BUNDLER" &>/dev/null; then
+      print_warning "Installing bundler $REQUIRED_BUNDLER..."
+      gem install bundler -v "$REQUIRED_BUNDLER"
+      print_success "Bundler $REQUIRED_BUNDLER installed"
+    fi
+  fi
+fi
+
 bundle install
 yarn install --immutable
 RAILS_ENV=production bundle exec rails assets:precompile

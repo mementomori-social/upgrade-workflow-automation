@@ -1,3 +1,13 @@
+### 1.0.4: 2025-10-21
+
+* Add automatic stash prompt for unstaged changes before git checkout operations
+* Add multi-package-manager support for GitHub CLI installation (Arch/pacman, Debian/Ubuntu/apt, Fedora/dnf, CentOS/yum, macOS/brew)
+* Add automatic GitHub CLI authentication check and login prompt within script
+* Add automatic bundler version detection and installation from Gemfile.lock
+* Make GitHub CLI required for fork synchronization (exits if not installed)
+* Change y/n prompts to require Enter key press instead of immediate response
+* Prevent script crashes when unstaged changes exist in working directory
+
 ### 1.0.3: 2025-09-20
 
 * Add maintenance message templates to production script for easy copy-paste
