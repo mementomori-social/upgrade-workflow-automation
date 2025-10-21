@@ -1,4 +1,4 @@
-### 1.0.4: 2025-10-21
+### 1.1.0: 2025-10-21
 
 * Add automatic stash prompt for unstaged changes before git checkout operations
 * Add multi-package-manager support for GitHub CLI installation (Arch/pacman, Debian/Ubuntu/apt, Fedora/dnf, CentOS/yum, macOS/brew)
