@@ -105,6 +105,17 @@ check_and_stash_changes() {
   fi
 }
 
+# Function to get all sidekiq services
+get_sidekiq_services() {
+  local services=$(systemctl list-units --all --type=service --no-legend | grep 'mastodon-sidekiq' | awk '{print $1}' | tr '\n' ' ')
+  if [[ -n "$services" ]]; then
+    echo "$services"
+  else
+    # Fallback to single service name
+    echo "mastodon-sidekiq"
+  fi
+}
+
 # Check if running as mastodon user
 if [[ "$USER" != "$MASTODON_USER" ]]; then
   print_error "This script must be run as the mastodon user"
@@ -176,7 +187,22 @@ prompt_action "Announcements created"
 print_info "Checking and starting required services..."
 SERVICES_TO_START=""
 
-for service in mastodon-web mastodon-sidekiq mastodon-streaming; do
+# Detect all sidekiq services
+SIDEKIQ_SERVICES=$(get_sidekiq_services)
+print_info "Detected sidekiq services: $SIDEKIQ_SERVICES"
+
+# Check web and streaming services
+for service in mastodon-web mastodon-streaming; do
+  if systemctl is-active --quiet "$service"; then
+    print_success "$service is already running"
+  else
+    print_warning "$service is not running - starting it..."
+    SERVICES_TO_START="$SERVICES_TO_START $service"
+  fi
+done
+
+# Check all sidekiq services
+for service in $SIDEKIQ_SERVICES; do
   if systemctl is-active --quiet "$service"; then
     print_success "$service is already running"
   else
@@ -588,7 +614,7 @@ print_info "Restarting Mastodon services..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
 else
-  sudo systemctl restart mastodon-web mastodon-sidekiq mastodon-streaming
+  sudo systemctl restart mastodon-web $SIDEKIQ_SERVICES mastodon-streaming
   sleep 5
   sudo systemctl restart postgresql
 fi
@@ -630,7 +656,7 @@ print_info "Final restart of services..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
 else
-  sudo systemctl restart mastodon-web mastodon-sidekiq mastodon-streaming
+  sudo systemctl restart mastodon-web $SIDEKIQ_SERVICES mastodon-streaming
   sleep 5
   sudo systemctl restart postgresql
 fi
@@ -758,7 +784,7 @@ print_info "Restarting services (this may take a moment)..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
 else
-  sudo systemctl restart mastodon-web mastodon-sidekiq mastodon-streaming
+  sudo systemctl restart mastodon-web $SIDEKIQ_SERVICES mastodon-streaming
   sleep 5
   sudo systemctl restart postgresql
 fi
