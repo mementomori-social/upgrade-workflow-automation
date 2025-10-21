@@ -18,6 +18,7 @@ sudo su mastodon
 ```
 
 ```bash
+# Long oneliner in local environment
 cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git) && cd ~/upgrade-workflow-automation &&  bash mastodon-upgrade-local.sh
 ```
 
@@ -32,7 +33,7 @@ sudo su mastodon
 ```
 
 ```bash
-# Oneliner
+# Long oneliner in production
 cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git) && cd ~/upgrade-workflow-automation && bash mastodon-upgrade-production.sh
 ```
 
