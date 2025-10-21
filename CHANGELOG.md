@@ -4,6 +4,7 @@
 * Add multi-package-manager support for GitHub CLI installation (Arch/pacman, Debian/Ubuntu/apt, Fedora/dnf, CentOS/yum, macOS/brew)
 * Add automatic GitHub CLI authentication check and login prompt within script
 * Add automatic bundler version detection and installation from Gemfile.lock
+* Add automatic corepack enablement for yarn support
 * Make GitHub CLI required for fork synchronization (exits if not installed)
 * Change y/n prompts to require Enter key press instead of immediate response
 * Prevent script crashes when unstaged changes exist in working directory
