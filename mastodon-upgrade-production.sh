@@ -113,9 +113,19 @@ show_maintenance_messages() {
 
 # Function to prompt for confirmation
 confirm() {
-  read -p "$1 (y/n): " -n 1 -r
-  echo
+  read -p "$1 (y/n): " -r
   [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+# Function to get all sidekiq services
+get_sidekiq_services() {
+  local services=$(systemctl list-units --all --type=service --no-legend | grep 'mastodon-sidekiq' | awk '{print $1}' | tr '\n' ' ')
+  if [[ -n "$services" ]]; then
+    echo "$services"
+  else
+    # Fallback to single service name
+    echo "mastodon-sidekiq"
+  fi
 }
 
 # Get version and date from changelog
@@ -131,8 +141,24 @@ echo
 
 # Check if services are currently running
 print_info "Checking current service status..."
+
+# Detect all sidekiq services
+SIDEKIQ_SERVICES=$(get_sidekiq_services)
+print_info "Detected sidekiq services: $SIDEKIQ_SERVICES"
+
 SERVICE_CHECK=0
-for service in mastodon-web mastodon-sidekiq mastodon-streaming; do
+# Check web and streaming
+for service in mastodon-web mastodon-streaming; do
+  if systemctl is-active --quiet "$service"; then
+    print_success "$service is running"
+  else
+    print_warning "$service is not running"
+    SERVICE_CHECK=1
+  fi
+done
+
+# Check all sidekiq services
+for service in $SIDEKIQ_SERVICES; do
   if systemctl is-active --quiet "$service"; then
     print_success "$service is running"
   else
@@ -356,27 +382,10 @@ print_success "Cache cleared"
 print_warning "About to restart Mastodon services - this will cause a brief interruption"
 if confirm "Restart services now?"; then
   print_info "Restarting Mastodon services..."
-  
-  # Restart services in the same order as /usr/local/bin/restart-mastodon
-  sudo systemctl restart mastodon-sidekiq.service
-  sudo systemctl restart mastodon-streaming.service
-  sudo systemctl restart mastodon-web.service
-  
-  # Restart specific sidekiq workers
-  sudo systemctl restart mastodon-sidekiq-1-default@35.service
-  sudo systemctl restart mastodon-sidekiq-2-default@35.service
-  sudo systemctl restart mastodon-sidekiq-1-ingress@25.service
-  sudo systemctl restart mastodon-sidekiq-2-ingress@25.service
-  sudo systemctl restart mastodon-sidekiq-pull@40.service
-  sudo systemctl restart mastodon-sidekiq-push@35.service
-  sudo systemctl restart mastodon-sidekiq-mailers@20.service
-  sudo systemctl restart mastodon-sidekiq-scheduler@5.service
-  
-  # Check if fasp service exists before restarting
-  if systemctl list-units --all | grep -q "mastodon-sidekiq-fasp@1"; then
-    sudo systemctl restart mastodon-sidekiq-fasp@1.service
-  fi
-  
+
+  # Restart all detected services
+  sudo systemctl restart mastodon-web mastodon-streaming $SIDEKIQ_SERVICES
+
   print_success "Services restarted"
 else
   print_warning "Services not restarted - manual restart required!"
