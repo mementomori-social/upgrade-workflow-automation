@@ -637,10 +637,46 @@ fi
 print_success "Final restart completed"
 
 # Step 14-15: Create new branch and merge mods
-print_info "Creating new branch: $NEW_BRANCH"
-git branch "$NEW_BRANCH"
-git checkout "$NEW_BRANCH"
-print_success "New branch created and checked out"
+print_info "Preparing branch: $NEW_BRANCH"
+
+# Check if branch already exists
+if git show-ref --verify --quiet "refs/heads/$NEW_BRANCH"; then
+  print_warning "Branch '$NEW_BRANCH' already exists"
+  echo "What would you like to do?"
+  echo "1. Use existing branch (checkout)"
+  echo "2. Delete and create new branch"
+  echo "3. Exit script"
+  read -p "Enter choice (1/2/3): " -r
+
+  case $REPLY in
+    1)
+      print_info "Checking out existing branch: $NEW_BRANCH"
+      git checkout "$NEW_BRANCH"
+      print_success "Checked out existing branch"
+      ;;
+    2)
+      print_warning "Deleting existing branch: $NEW_BRANCH"
+      git branch -D "$NEW_BRANCH"
+      print_info "Creating new branch: $NEW_BRANCH"
+      git branch "$NEW_BRANCH"
+      git checkout "$NEW_BRANCH"
+      print_success "New branch created and checked out"
+      ;;
+    3)
+      print_info "Exiting script"
+      exit 0
+      ;;
+    *)
+      print_error "Invalid choice"
+      exit 1
+      ;;
+  esac
+else
+  print_info "Creating new branch: $NEW_BRANCH"
+  git branch "$NEW_BRANCH"
+  git checkout "$NEW_BRANCH"
+  print_success "New branch created and checked out"
+fi
 
 if [[ -n "$CURRENT_VERSION" ]]; then
   print_info "Attempting to merge $CURRENT_VERSION..."
