@@ -40,15 +40,8 @@ sudo su mastodon
 ```
 
 ```bash
-cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git)
-```
-
-```bash
-cd ~/upgrade-workflow-automation
-```
-
-```bash
-bash mastodon-upgrade-production.sh
+# Oneliner
+cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git) && cd ~/upgrade-workflow-automation && bash mastodon-upgrade-production.sh
 ```
 
 Optional: Update Mastodon Bird UI if there are new changes:
