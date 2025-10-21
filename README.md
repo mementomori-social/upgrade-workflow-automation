@@ -18,15 +18,7 @@ sudo su mastodon
 ```
 
 ```bash
-cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git)
-```
-
-```bash
-cd ~/upgrade-workflow-automation
-```
-
-```bash
-bash mastodon-upgrade-local.sh
+cd ~ && (test -d upgrade-workflow-automation && cd upgrade-workflow-automation && git pull || git clone https://github.com/mementomori-social/upgrade-workflow-automation.git) && cd ~/upgrade-workflow-automation &&  bash mastodon-upgrade-local.sh
 ```
 
 After testing and verification, SSH to your production server and deploy:
