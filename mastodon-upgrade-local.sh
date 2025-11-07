@@ -598,13 +598,6 @@ if [[ -n "$PENDING_MIGRATIONS" ]]; then
     RAILS_ENV=production bundle exec rails db:migrate
     print_success "Migrations completed"
   fi
-  
-  # Check for manual migrations
-  if confirm "Do you need to run specific migrations manually?"; then
-    read -p "Enter migration VERSION (e.g., 20230724160715): " MIGRATION_VERSION
-    RAILS_ENV=production bundle exec rails db:migrate:up VERSION="$MIGRATION_VERSION"
-    print_success "Manual migration completed"
-  fi
 else
   print_info "No pending migrations"
 fi
