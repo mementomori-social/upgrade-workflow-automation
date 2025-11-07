@@ -84,13 +84,19 @@ confirm() {
 
 # Function to check for unstaged changes and offer to stash
 check_and_stash_changes() {
-  if ! git diff-files --quiet; then
+  # Check for unstaged changes excluding .env files
+  local unstaged_files=$(git diff-files --name-only | grep -v '\.env')
+
+  if [[ -n "$unstaged_files" ]]; then
     print_warning "You have unstaged changes in your working directory:"
-    git status --short
+    echo "$unstaged_files" | while read file; do
+      echo " M $file"
+    done
     echo
     if confirm "Would you like to stash these changes?"; then
-      print_info "Stashing changes..."
-      git stash push -m "Auto-stash before upgrade on $(date '+%Y-%m-%d %H:%M:%S')"
+      print_info "Stashing changes (excluding .env files)..."
+      # Stash only non-.env files
+      git stash push -m "Auto-stash before upgrade on $(date '+%Y-%m-%d %H:%M:%S')" -- $(git diff-files --name-only | grep -v '\.env')
       print_success "Changes stashed successfully"
       echo "To restore your changes later, run: git stash pop"
       return 0
@@ -434,53 +440,53 @@ print_info "Detecting latest stable version..."
 LATEST_STABLE=$(git tag -l 'v*' --sort=-version:refname | grep -v -E '(alpha|beta|rc)' | head -n1)
 if [[ -n "$LATEST_STABLE" ]]; then
   print_success "Latest stable version found: $LATEST_STABLE"
-  if confirm "Use nightly (main) version instead of last stable ($LATEST_STABLE)?"; then
-    print_info "Checking out and updating main branch..."
-    git fetch --all
-    yarn cache clean
-    check_and_stash_changes
-    git checkout main
-    git pull $UPSTREAM_REMOTE main
-    
-    # Show latest main commit info
-    MAIN_COMMIT_HASH=$(git rev-parse --short HEAD)
-    MAIN_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD)
-    MAIN_COMMIT_DATE=$(git log -1 --pretty=format:"%cr" HEAD)
-    print_success "Latest main commit: $MAIN_COMMIT_HASH - $MAIN_COMMIT_MSG"
-    print_info "  Date: $MAIN_COMMIT_DATE"
-    print_info "  Link: https://github.com/$OFFICIAL_MASTODON_REPO/commit/$MAIN_COMMIT_HASH"
-  else
-    print_info "Checking out stable version $LATEST_STABLE..."
-    yarn cache clean
-    git fetch
-    check_and_stash_changes
-    git checkout "$LATEST_STABLE"
-  fi
 else
   print_warning "Could not detect latest stable version"
-  if confirm "Use main branch (nightly)?"; then
-    print_info "Checking out and updating main branch..."
-    git fetch --all
-    yarn cache clean
-    check_and_stash_changes
-    git checkout main
-    git pull $UPSTREAM_REMOTE main
+  LATEST_STABLE="unknown"
+fi
 
-    # Show latest main commit info
-    MAIN_COMMIT_HASH=$(git rev-parse --short HEAD)
-    MAIN_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD)
-    MAIN_COMMIT_DATE=$(git log -1 --pretty=format:"%cr" HEAD)
-    print_success "Latest main commit: $MAIN_COMMIT_HASH - $MAIN_COMMIT_MSG"
-    print_info "  Date: $MAIN_COMMIT_DATE"
-    print_info "  Link: https://github.com/$OFFICIAL_MASTODON_REPO/commit/$MAIN_COMMIT_HASH"
-  else
-    read -p "Enter the version tag (e.g., v4.4.0): " VERSION_TAG
-    print_info "Checking out $VERSION_TAG..."
-    yarn cache clean
-    git fetch
-    check_and_stash_changes
-    git checkout "$VERSION_TAG"
+echo
+echo "Enter version to use:"
+echo "- Type 'main' for nightly/development version"
+echo "- Type version number (e.g., '4.5.0' or 'v4.5.0') for specific release"
+if [[ "$LATEST_STABLE" != "unknown" ]]; then
+  echo "- Press Enter to use latest stable: $LATEST_STABLE"
+fi
+read -p "Version: " -r VERSION_INPUT
+
+# Default to latest stable if empty
+if [[ -z "$VERSION_INPUT" && "$LATEST_STABLE" != "unknown" ]]; then
+  VERSION_INPUT="$LATEST_STABLE"
+fi
+
+# Process the version input
+if [[ "$VERSION_INPUT" == "main" ]]; then
+  print_info "Checking out and updating main branch..."
+  git fetch --all
+  yarn cache clean
+  check_and_stash_changes
+  git checkout main
+  git pull $UPSTREAM_REMOTE main
+
+  # Show latest main commit info
+  MAIN_COMMIT_HASH=$(git rev-parse --short HEAD)
+  MAIN_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD)
+  MAIN_COMMIT_DATE=$(git log -1 --pretty=format:"%cr" HEAD)
+  print_success "Latest main commit: $MAIN_COMMIT_HASH - $MAIN_COMMIT_MSG"
+  print_info "  Date: $MAIN_COMMIT_DATE"
+  print_info "  Link: https://github.com/$OFFICIAL_MASTODON_REPO/commit/$MAIN_COMMIT_HASH"
+else
+  # Add 'v' prefix if not present
+  if [[ ! "$VERSION_INPUT" =~ ^v ]]; then
+    VERSION_INPUT="v$VERSION_INPUT"
   fi
+
+  print_info "Checking out version $VERSION_INPUT..."
+  yarn cache clean
+  git fetch
+  check_and_stash_changes
+  git checkout "$VERSION_INPUT"
+  print_success "Checked out $VERSION_INPUT"
 fi
 print_success "Branch checked out and updated"
 
