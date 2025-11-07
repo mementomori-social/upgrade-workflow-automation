@@ -1,5 +1,6 @@
 ### 1.1.1: 2025-11-07
 
+* Fix latest stable version detection to exclude pre-release versions (alpha, beta, rc)
 * Update configuration file error messages to reference .env.development
 
 ### 1.1.0: 2025-10-21

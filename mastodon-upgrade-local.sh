@@ -431,7 +431,7 @@ print_success "Fetched all changes"
 # Step 5: Choose between stable or nightly version
 echo
 print_info "Detecting latest stable version..."
-LATEST_STABLE=$(git tag -l 'v*' --sort=-version:refname | head -n1)
+LATEST_STABLE=$(git tag -l 'v*' --sort=-version:refname | grep -v -E '(alpha|beta|rc)' | head -n1)
 if [[ -n "$LATEST_STABLE" ]]; then
   print_success "Latest stable version found: $LATEST_STABLE"
   if confirm "Use nightly (main) version instead of last stable ($LATEST_STABLE)?"; then
