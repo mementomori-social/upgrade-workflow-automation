@@ -1,5 +1,7 @@
 ### 1.1.1: 2025-11-07
 
+* Change version selection to direct input (type 'main' or version number like '4.5.0')
+* Exclude .env files from unstaged changes check and stash operations
 * Fix latest stable version detection to exclude pre-release versions (alpha, beta, rc)
 * Update configuration file error messages to reference .env.development
 
