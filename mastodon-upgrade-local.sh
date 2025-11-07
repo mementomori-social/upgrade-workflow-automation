@@ -38,7 +38,7 @@ elif [[ -f "$SCRIPT_DIR/.env" ]]; then
   source "$SCRIPT_DIR/.env"
 fi
 
-# Default configuration (can be overridden by .env)
+# Default configuration (can be overridden by .env.development or .env)
 MASTODON_DIR="${MASTODON_DIR:-/opt/mastodon}"
 MASTODON_USER="${MASTODON_USER:-mastodon}"
 YOUR_FORK_REPO="${YOUR_FORK_REPO:-${GITHUB_REPO:-your-org/mastodon}}"
@@ -284,7 +284,7 @@ done < <(git remote -v)
 
 # Validate remotes
 if [[ -z "$ORIGIN_REMOTE" ]]; then
-  print_error "Could not find remote for your fork (check YOUR_FORK_REPO in .env)"
+  print_error "Could not find remote for your fork (check YOUR_FORK_REPO in .env.development)"
   read -p "Enter the remote name for your fork: " ORIGIN_REMOTE
 fi
 

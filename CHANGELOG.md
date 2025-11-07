@@ -1,3 +1,7 @@
+### 1.1.1: 2025-11-07
+
+* Update configuration file error messages to reference .env.development
+
 ### 1.1.0: 2025-10-21
 
 * Add automatic stash prompt for unstaged changes before git checkout operations
