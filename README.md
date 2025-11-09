@@ -156,68 +156,36 @@ If not using a `.env` file, you can edit the scripts directly to customize:
 
 ## Systemd service configuration
 
-### Development environment setup
+Template service files for development environment are provided in the `systemd/` directory. These are configured for `/opt/mastodon` with `RAILS_ENV=development` and `NODE_ENV=development`.
 
-For local development, configure systemd services to use `RAILS_ENV=development`:
-
-#### Update service files
+### Install service files
 
 ```bash
-# Update all Mastodon service files for development mode
-for service in /etc/systemd/system/mastodon-*.service; do
-  sudo sed -i 's/RAILS_ENV=production/RAILS_ENV=development/' "$service"
-  sudo sed -i 's|ReadWritePaths=/home/mastodon/live|ReadWritePaths=/opt/mastodon|' "$service"
-done
+# Copy service files to systemd
+sudo cp systemd/*.service /etc/systemd/system/
 sudo systemctl daemon-reload
+
+# Enable services to start on boot
+sudo systemctl enable mastodon-web mastodon-sidekiq mastodon-streaming mastodon-streaming@4000
 ```
 
-#### Service management commands
+### Service management
 
 ```bash
-# Check service status
-systemctl status mastodon-web
-systemctl status mastodon-streaming
-systemctl status mastodon-sidekiq-*
-
 # Start services
-sudo systemctl start mastodon-web mastodon-streaming
+sudo systemctl start mastodon-web mastodon-sidekiq mastodon-streaming
 
-# Restart all Mastodon services
-sudo systemctl restart mastodon-web mastodon-streaming mastodon-sidekiq-*
-
-# Stop services
-sudo systemctl stop mastodon-web mastodon-streaming mastodon-sidekiq-*
+# Restart services
+sudo systemctl restart mastodon-web mastodon-sidekiq mastodon-streaming
 
 # View logs
-journalctl -u mastodon-web.service -f
-journalctl -u mastodon-streaming.service -f
+journalctl -u mastodon-web -f
+journalctl -u mastodon-streaming@4000 -f
 ```
-
-#### Key configuration requirements
-
-Development (`/opt/mastodon`):
-- `Environment="RAILS_ENV=development"`
-- `ReadWritePaths=/opt/mastodon`
-- `WorkingDirectory=/opt/mastodon`
-
-Production (`/home/mastodon/live`):
-- `Environment="RAILS_ENV=production"`
-- `ReadWritePaths=/home/mastodon/live`
-- `WorkingDirectory=/home/mastodon/live`
 
 ### Environment files
 
-Mastodon uses cascading environment file loading:
-
-Development:
-- `.env.development` - Tracked in git, contains defaults
-- `.env.development.local` - Ignored by git, contains your local overrides
-
-Production:
-- `.env.production` - Contains production configuration
-- `.env.production.local` - Contains production overrides (optional)
-
-The `*.local` files take precedence and are automatically ignored by git (via `.env*.local` in `.gitignore`).
+Mastodon loads environment variables from `.env.{environment}.local` files, which override tracked defaults. Create `.env.development.local` in your Mastodon directory with your configuration (database credentials, domain, secrets, etc). This file is ignored by git.
 
 ## Workflow
 
