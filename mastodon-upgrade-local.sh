@@ -84,8 +84,18 @@ confirm() {
 
 # Function to check for unstaged changes and offer to stash
 check_and_stash_changes() {
-  # Check for unstaged changes excluding .env files
-  local unstaged_files=$(git diff-files --name-only | grep -v '\.env')
+  # First, restore any tracked .env* files to avoid blocking checkout/pull
+  local env_changes=$(git diff-files --name-only | grep '\.env' || true)
+  if [[ -n "$env_changes" ]]; then
+    print_info "Restoring tracked .env files to avoid conflicts..."
+    echo "$env_changes" | while read file; do
+      git restore "$file"
+      echo "  Restored: $file"
+    done
+  fi
+
+  # Check for remaining unstaged changes (non-.env files)
+  local unstaged_files=$(git diff-files --name-only)
 
   if [[ -n "$unstaged_files" ]]; then
     print_warning "You have unstaged changes in your working directory:"
@@ -94,9 +104,8 @@ check_and_stash_changes() {
     done
     echo
     if confirm "Would you like to stash these changes?"; then
-      print_info "Stashing changes (excluding .env files)..."
-      # Stash only non-.env files
-      git stash push -m "Auto-stash before upgrade on $(date '+%Y-%m-%d %H:%M:%S')" -- $(git diff-files --name-only | grep -v '\.env')
+      print_info "Stashing changes..."
+      git stash push -m "Auto-stash before upgrade on $(date '+%Y-%m-%d %H:%M:%S')"
       print_success "Changes stashed successfully"
       echo "To restore your changes later, run: git stash pop"
       return 0
@@ -105,7 +114,7 @@ check_and_stash_changes() {
       echo "Please either:"
       echo "  1. Stash your changes: git stash"
       echo "  2. Commit your changes: git add . && git commit"
-      echo "  3. Discard your changes: git checkout -- ."
+      echo "  3. Discard your changes: git restore ."
       exit 1
     fi
   fi
