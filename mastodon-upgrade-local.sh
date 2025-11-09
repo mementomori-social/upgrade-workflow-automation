@@ -592,19 +592,19 @@ echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 yarn install --immutable
 echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
-RAILS_ENV=production bundle exec rails assets:precompile
+RAILS_ENV=development bundle exec rails assets:precompile
 print_success "Build completed"
 
 # Step 7: Check migrations
 print_info "Checking for pending migrations..."
-PENDING_MIGRATIONS=$(RAILS_ENV=production bundle exec rails db:migrate:status | grep down || true)
+PENDING_MIGRATIONS=$(RAILS_ENV=development bundle exec rails db:migrate:status | grep down || true)
 if [[ -n "$PENDING_MIGRATIONS" ]]; then
   print_warning "Pending migrations found:"
   echo "$PENDING_MIGRATIONS"
   
   # Step 8: Run migrations
   if confirm "Run migrations?"; then
-    RAILS_ENV=production bundle exec rails db:migrate
+    RAILS_ENV=development bundle exec rails db:migrate
     print_success "Migrations completed"
   fi
 else
@@ -613,7 +613,7 @@ fi
 
 # Step 9: Clear cache if needed
 if confirm "Clear cache before restart?"; then
-  RAILS_ENV=production /opt/mastodon/bin/tootctl cache clear
+  RAILS_ENV=development /opt/mastodon/bin/tootctl cache clear
   print_success "Cache cleared"
 fi
 
@@ -651,11 +651,11 @@ if confirm "Reset and rebuild search index?"; then
   fi
   
   print_info "Resetting search index..."
-  RAILS_ENV=production bin/tootctl search deploy --reset-chewy
-  
+  RAILS_ENV=development bin/tootctl search deploy --reset-chewy
+
   print_info "Rebuilding search index (this may take a while)..."
-  RAILS_ENV=production bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096
-  RAILS_ENV=production bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096
+  RAILS_ENV=development bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096
+  RAILS_ENV=development bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096
   print_success "Search index rebuilt"
 fi
 
@@ -782,11 +782,11 @@ fi
 
 bundle install
 yarn install --immutable
-RAILS_ENV=production bundle exec rails assets:precompile
+RAILS_ENV=development bundle exec rails assets:precompile
 
 # Clear toot cache before restart
 print_info "Clearing toot cache..."
-RAILS_ENV=production /opt/mastodon/bin/tootctl cache clear
+RAILS_ENV=development /opt/mastodon/bin/tootctl cache clear
 
 print_info "Restarting services (this may take a moment)..."
 if command -v restart-mastodon &> /dev/null; then
