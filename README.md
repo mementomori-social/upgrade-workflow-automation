@@ -149,9 +149,75 @@ If not using a `.env` file, you can edit the scripts directly to customize:
 - `YOUR_FORK_REPO="your-org/mastodon"` - Your fork repository
 
 #### Production environment settings
+
 - `PRODUCTION_MASTODON_DIR="/home/mastodon/live"` - Production Mastodon directory
 - `DB_HOST`, `DB_PORT`, `DB_USER` - Database server settings for backups
 - `BACKUP_DIR="/tmp/mastodon-backups"` - Where to store database backups
+
+## Systemd service configuration
+
+### Development environment setup
+
+For local development, configure systemd services to use `RAILS_ENV=development`:
+
+#### Update service files
+
+```bash
+# Update all Mastodon service files for development mode
+for service in /etc/systemd/system/mastodon-*.service; do
+  sudo sed -i 's/RAILS_ENV=production/RAILS_ENV=development/' "$service"
+  sudo sed -i 's|ReadWritePaths=/home/mastodon/live|ReadWritePaths=/opt/mastodon|' "$service"
+done
+sudo systemctl daemon-reload
+```
+
+#### Service management commands
+
+```bash
+# Check service status
+systemctl status mastodon-web
+systemctl status mastodon-streaming
+systemctl status mastodon-sidekiq-*
+
+# Start services
+sudo systemctl start mastodon-web mastodon-streaming
+
+# Restart all Mastodon services
+sudo systemctl restart mastodon-web mastodon-streaming mastodon-sidekiq-*
+
+# Stop services
+sudo systemctl stop mastodon-web mastodon-streaming mastodon-sidekiq-*
+
+# View logs
+journalctl -u mastodon-web.service -f
+journalctl -u mastodon-streaming.service -f
+```
+
+#### Key configuration requirements
+
+Development (`/opt/mastodon`):
+- `Environment="RAILS_ENV=development"`
+- `ReadWritePaths=/opt/mastodon`
+- `WorkingDirectory=/opt/mastodon`
+
+Production (`/home/mastodon/live`):
+- `Environment="RAILS_ENV=production"`
+- `ReadWritePaths=/home/mastodon/live`
+- `WorkingDirectory=/home/mastodon/live`
+
+### Environment files
+
+Mastodon uses cascading environment file loading:
+
+Development:
+- `.env.development` - Tracked in git, contains defaults
+- `.env.development.local` - Ignored by git, contains your local overrides
+
+Production:
+- `.env.production` - Contains production configuration
+- `.env.production.local` - Contains production overrides (optional)
+
+The `*.local` files take precedence and are automatically ignored by git (via `.env*.local` in `.gitignore`).
 
 ## Workflow
 
