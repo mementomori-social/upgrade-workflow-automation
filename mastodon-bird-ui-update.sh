@@ -62,8 +62,7 @@ print_error() {
 
 # Function to prompt for confirmation
 confirm() {
-  read -p "$1 (y/n): " -n 1 -r
-  echo
+  read -p "$1 (y/n): " -r
   [[ $REPLY =~ ^[Yy]$ ]]
 }
 
@@ -110,12 +109,26 @@ fi
 
 # Ask for version preference
 echo
-if confirm "Use nightly (release candidate) version instead of stable?"; then
+echo "Enter branch to use:"
+echo "- Type 'nightly' for nightly/release candidate version"
+echo "- Type 'main' for stable version"
+echo "- Press Enter to use nightly (default)"
+read -p "Branch: " -r BRANCH_INPUT
+
+# Default to nightly if empty
+if [[ -z "$BRANCH_INPUT" ]]; then
+  BRANCH="nightly"
+  print_info "Using nightly version (default)"
+elif [[ "$BRANCH_INPUT" == "nightly" ]]; then
   BRANCH="nightly"
   print_info "Using nightly version"
-else
+elif [[ "$BRANCH_INPUT" == "main" ]]; then
   BRANCH="main"
-  print_info "Using stable version"
+  print_info "Using stable version (main)"
+else
+  print_error "Invalid branch name: $BRANCH_INPUT"
+  print_info "Please use 'main' or 'nightly'"
+  exit 1
 fi
 
 # Check write permissions
