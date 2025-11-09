@@ -1,5 +1,6 @@
 ### 1.1.2: 2025-11-09
 
+* Fix local script to use RAILS_ENV=development instead of production
 * Change version selection to direct input (type 'main' or version number like '4.5.0')
 * Auto-restore tracked .env* files before checkout/pull to prevent blocking
 * Remove redundant manual migration prompt after automated migrations complete
