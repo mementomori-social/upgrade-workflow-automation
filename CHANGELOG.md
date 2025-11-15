@@ -1,5 +1,6 @@
 ### 1.1.3: 2025-11-15
 
+* Add automatic ICU library compatibility check and native gem rebuilding (fixes charlock_holmes errors)
 * Fix date formatting for non-English locales (Finnish) by using LC_TIME=en_US.UTF-8
 * Fix sidekiq service detection removing formatting characters (●) from systemctl output
 * Change Bird UI update script to use direct branch input instead of y/n prompt

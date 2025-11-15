@@ -128,6 +128,31 @@ get_sidekiq_services() {
   fi
 }
 
+# Function to check and fix ICU library issues with native gems
+check_and_fix_native_gems() {
+  print_info "Checking native gem compatibility..."
+
+  # Try to load charlock_holmes to detect ICU version mismatches
+  if ! bundle exec ruby -e "require 'charlock_holmes'" 2>/dev/null; then
+    local error_output=$(bundle exec ruby -e "require 'charlock_holmes'" 2>&1)
+
+    # Check if it's an ICU library error
+    if echo "$error_output" | grep -q "libicudata.so"; then
+      print_warning "ICU library version mismatch detected"
+      print_info "Rebuilding native gems against current ICU version..."
+
+      # Uninstall and reinstall charlock_holmes to recompile against current ICU
+      gem uninstall charlock_holmes -x -I 2>/dev/null || true
+
+      # Reinstall will happen during bundle install
+      print_success "Native gem will be recompiled during bundle install"
+      return 0
+    fi
+  fi
+
+  print_success "Native gems are compatible"
+}
+
 # Get version and date from changelog
 SCRIPT_VERSION_LINE=$(head -n1 "$SCRIPT_DIR/CHANGELOG.md" 2>/dev/null || echo "### 1.0.1: 2025-08-30")
 SCRIPT_VERSION=$(echo "$SCRIPT_VERSION_LINE" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.1")
@@ -337,6 +362,10 @@ fi
 print_info "Rebuilding application (this may take a while)..."
 yarn cache clean
 rm -rf node_modules
+
+# Check for ICU library compatibility issues before bundle install
+check_and_fix_native_gems
+
 bundle install
 yarn install --immutable
 RAILS_ENV=production bundle exec rails assets:precompile
