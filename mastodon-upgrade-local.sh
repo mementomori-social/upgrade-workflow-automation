@@ -122,7 +122,7 @@ check_and_stash_changes() {
 
 # Function to get all sidekiq services
 get_sidekiq_services() {
-  local services=$(systemctl list-units --all --type=service --no-legend | grep 'mastodon-sidekiq' | awk '{print $1}' | tr '\n' ' ')
+  local services=$(systemctl list-units --all --type=service --plain --no-legend | grep 'mastodon-sidekiq' | awk '{print $1}' | tr '\n' ' ')
   if [[ -n "$services" ]]; then
     echo "$services"
   else
@@ -184,8 +184,8 @@ echo "   Message:"
 echo "We'll be performing Mastodon software upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience. Status: $STATUS_URL"
 echo
 # Calculate maintenance window (current time + 2 hours)
-MAINTENANCE_START=$(date "+%m/%d/%Y %I:%M %p")
-MAINTENANCE_END=$(date -d "+2 hours" "+%m/%d/%Y %I:%M %p")
+MAINTENANCE_START=$(LC_TIME=en_US.UTF-8 date "+%m/%d/%Y, %I:%M %p")
+MAINTENANCE_END=$(LC_TIME=en_US.UTF-8 date -d "+2 hours" "+%m/%d/%Y, %I:%M %p")
 TIMEZONE=$(date +"%Z")
 
 echo "2. Create maintenance window:"
