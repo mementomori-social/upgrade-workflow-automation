@@ -1,3 +1,9 @@
+### 1.1.3: 2025-11-15
+
+* Fix date formatting for non-English locales (Finnish) by using LC_TIME=en_US.UTF-8
+* Fix sidekiq service detection removing formatting characters (●) from systemctl output
+* Change Bird UI update script to use direct branch input instead of y/n prompt
+
 ### 1.1.2: 2025-11-09
 
 * Fix local script to use RAILS_ENV=development instead of production
