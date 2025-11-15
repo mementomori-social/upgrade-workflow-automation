@@ -131,6 +131,31 @@ get_sidekiq_services() {
   fi
 }
 
+# Function to check and fix ICU library issues with native gems
+check_and_fix_native_gems() {
+  print_info "Checking native gem compatibility..."
+
+  # Try to load charlock_holmes to detect ICU version mismatches
+  if ! bundle exec ruby -e "require 'charlock_holmes'" 2>/dev/null; then
+    local error_output=$(bundle exec ruby -e "require 'charlock_holmes'" 2>&1)
+
+    # Check if it's an ICU library error
+    if echo "$error_output" | grep -q "libicudata.so"; then
+      print_warning "ICU library version mismatch detected"
+      print_info "Rebuilding native gems against current ICU version..."
+
+      # Uninstall and reinstall charlock_holmes to recompile against current ICU
+      gem uninstall charlock_holmes -x -I 2>/dev/null || true
+
+      # Reinstall will happen during bundle install
+      print_success "Native gem will be recompiled during bundle install"
+      return 0
+    fi
+  fi
+
+  print_success "Native gems are compatible"
+}
+
 # Check if running as mastodon user
 if [[ "$USER" != "$MASTODON_USER" ]]; then
   print_error "This script must be run as the mastodon user"
@@ -585,6 +610,9 @@ if [[ -f "Gemfile.lock" ]]; then
   fi
 fi
 
+# Check for ICU library compatibility issues before bundle install
+check_and_fix_native_gems
+
 echo -e "${YELLOW}  ⏳ Running bundle install...${NC}"
 bundle install
 echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
@@ -779,6 +807,9 @@ if [[ -f "Gemfile.lock" ]]; then
     fi
   fi
 fi
+
+# Check for ICU library compatibility issues before bundle install
+check_and_fix_native_gems
 
 bundle install
 yarn install --immutable
