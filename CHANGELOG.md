@@ -1,5 +1,6 @@
 ### 1.1.4: 2025-12-07
 
+* Add automatic local database backup with disk space check before upgrade
 * Add automatic detection and resolution of incomplete merges from interrupted script runs
 * Improve merge conflict handling with options to resolve, abort, or exit
 
