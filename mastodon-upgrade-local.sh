@@ -84,6 +84,30 @@ confirm() {
 
 # Function to check for unstaged changes and offer to stash
 check_and_stash_changes() {
+  # Check for incomplete merge first
+  if [[ -f "$MASTODON_DIR/.git/MERGE_HEAD" ]]; then
+    print_error "Incomplete merge detected in your repository"
+    print_warning "This likely happened because a previous script run was interrupted"
+    echo
+    echo "Conflicted files:"
+    git diff --name-only --diff-filter=U 2>/dev/null | while read file; do
+      echo "  - $file"
+    done
+    echo
+    echo "This needs to be resolved before continuing."
+    if confirm "Abort the incomplete merge and start fresh?"; then
+      print_info "Aborting incomplete merge..."
+      git merge --abort
+      print_success "Merge aborted - repository is now clean"
+    else
+      print_error "Cannot proceed with incomplete merge"
+      echo "Please resolve the merge manually before running this script:"
+      echo "  1. To abort: git merge --abort"
+      echo "  2. To complete: fix conflicts, then git add . && git commit"
+      exit 1
+    fi
+  fi
+
   # First, restore any tracked .env* files to avoid blocking checkout/pull
   local env_changes=$(git diff-files --name-only | grep '\.env' || true)
   if [[ -n "$env_changes" ]]; then

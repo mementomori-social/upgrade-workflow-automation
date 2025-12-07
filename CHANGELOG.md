@@ -1,3 +1,7 @@
+### 1.1.4: 2025-12-07
+
+* Add automatic detection and resolution of incomplete merges from interrupted script runs
+
 ### 1.1.3: 2025-11-15
 
 * Add automatic ICU library compatibility check and native gem rebuilding (fixes charlock_holmes errors)
