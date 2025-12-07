@@ -157,6 +157,19 @@ get_sidekiq_services() {
   fi
 }
 
+# Helper function to format bytes to human readable (GB if >= 1000MB, otherwise MB)
+format_size() {
+  local bytes=$1
+  local mb=$((bytes / 1024 / 1024))
+  if [[ $mb -ge 1000 ]]; then
+    local gb_int=$((mb / 1024))
+    local gb_dec=$(( (mb % 1024) * 10 / 1024 ))
+    echo "${gb_int}.${gb_dec}GB"
+  else
+    echo "${mb}MB"
+  fi
+}
+
 # Function to backup local development database
 backup_local_database() {
   print_info "Checking disk space for local database backup..."
@@ -169,22 +182,22 @@ backup_local_database() {
   fi
 
   # Convert to human readable
-  local db_size_mb=$((db_size / 1024 / 1024))
-  print_info "Local database size: ${db_size_mb}MB"
+  local db_size_human=$(format_size $db_size)
+  print_info "Local database size: $db_size_human"
 
   # Check available disk space in backup directory
   local available_space=$(df -B1 "$LOCAL_BACKUP_DIR" 2>/dev/null | tail -1 | awk '{print $4}')
-  local available_mb=$((available_space / 1024 / 1024))
+  local available_human=$(format_size $available_space)
 
   # Need at least 2x database size for safety (compressed backup + overhead)
   local required_space=$((db_size * 2))
-  local required_mb=$((required_space / 1024 / 1024))
+  local required_human=$(format_size $required_space)
 
-  print_info "Available disk space: ${available_mb}MB (need ~${required_mb}MB)"
+  print_info "Available disk space: $available_human (need ~$required_human)"
 
   if [[ "$available_space" -lt "$required_space" ]]; then
     print_error "Insufficient disk space for backup"
-    print_warning "Available: ${available_mb}MB, Required: ~${required_mb}MB"
+    print_warning "Available: $available_human, Required: ~$required_human"
     if ! confirm "Continue without local backup?"; then
       exit 1
     fi
