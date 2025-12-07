@@ -51,6 +51,8 @@ INSTANCE_URL="${INSTANCE_URL:-https://your-instance.com}"
 TEST_URL="${TEST_URL:-https://your-test-instance.com}"
 STATUS_URL="${STATUS_URL:-https://status.your-instance.com}"
 MAINTENANCE_URL="${MAINTENANCE_URL:-https://your-status-page-url/maintenances}"
+LOCAL_BACKUP_DIR="${LOCAL_BACKUP_DIR:-$SCRIPT_DIR}"
+LOCAL_DB_NAME="${LOCAL_DB_NAME:-mastodon_development}"
 
 # Function to print colored messages
 print_info() {
@@ -155,6 +157,66 @@ get_sidekiq_services() {
   fi
 }
 
+# Function to backup local development database
+backup_local_database() {
+  print_info "Checking disk space for local database backup..."
+
+  # Get database size
+  local db_size=$(psql -d "$LOCAL_DB_NAME" -t -c "SELECT pg_database_size('$LOCAL_DB_NAME');" 2>/dev/null | tr -d ' ')
+  if [[ -z "$db_size" || "$db_size" == "0" ]]; then
+    print_warning "Could not determine database size, skipping automatic backup"
+    return 1
+  fi
+
+  # Convert to human readable
+  local db_size_mb=$((db_size / 1024 / 1024))
+  print_info "Local database size: ${db_size_mb}MB"
+
+  # Check available disk space in backup directory
+  local available_space=$(df -B1 "$LOCAL_BACKUP_DIR" 2>/dev/null | tail -1 | awk '{print $4}')
+  local available_mb=$((available_space / 1024 / 1024))
+
+  # Need at least 2x database size for safety (compressed backup + overhead)
+  local required_space=$((db_size * 2))
+  local required_mb=$((required_space / 1024 / 1024))
+
+  print_info "Available disk space: ${available_mb}MB (need ~${required_mb}MB)"
+
+  if [[ "$available_space" -lt "$required_space" ]]; then
+    print_error "Insufficient disk space for backup"
+    print_warning "Available: ${available_mb}MB, Required: ~${required_mb}MB"
+    if ! confirm "Continue without local backup?"; then
+      exit 1
+    fi
+    return 1
+  fi
+
+  # Create backup filename with timestamp
+  local backup_file="$LOCAL_BACKUP_DIR/${LOCAL_DB_NAME}_$(date +%Y-%m-%d_%H-%M).backup"
+
+  print_info "Creating local database backup..."
+  print_info "Backup file: $backup_file"
+
+  if pg_dump \
+    --format=custom \
+    --no-owner \
+    --compress=5 \
+    --file="$backup_file" \
+    "$LOCAL_DB_NAME" 2>/dev/null; then
+
+    local backup_size=$(du -h "$backup_file" | cut -f1)
+    print_success "Local database backed up successfully ($backup_size)"
+    echo "Backup location: $backup_file"
+    return 0
+  else
+    print_error "Local database backup failed"
+    if ! confirm "Continue without local backup?"; then
+      exit 1
+    fi
+    return 1
+  fi
+}
+
 # Function to check and fix ICU library issues with native gems
 check_and_fix_native_gems() {
   print_info "Checking native gem compatibility..."
@@ -201,9 +263,14 @@ SCRIPT_DATE=$(echo "$SCRIPT_VERSION_LINE" | grep -o '[0-9]\{4\}-[0-9]\{2\}-[0-9]
 print_info "Mastodon local development upgrade script ${BLUE}v$SCRIPT_VERSION ($SCRIPT_DATE)${NC}"
 print_info "Starting upgrade process for local development environment"
 
-# Step 0: Database backup (FIRST - takes longest)
+# Step 0a: Local development database backup (automatic)
 echo
-print_warning "FIRST: Start database backup now (takes 30+ minutes)"
+print_info "Creating local development database backup first..."
+backup_local_database
+
+# Step 0b: Production database backup (manual - takes longest)
+echo
+print_warning "NEXT: Start production database backup now (takes 30+ minutes)"
 echo
 echo "To create a backup, run these commands on the database server:"
 echo
