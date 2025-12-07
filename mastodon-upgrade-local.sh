@@ -769,15 +769,44 @@ if [[ -n "$CURRENT_VERSION" ]]; then
   if git merge "$CURRENT_VERSION"; then
     print_success "Merge successful"
   else
-    print_error "Merge failed - manual intervention required"
-    echo "Please resolve conflicts and then continue"
-    prompt_action "Merge conflicts resolved"
-    
-    # Ask about manual mods only if merge failed
-    if confirm "Do you need to manually apply additional mods from the previous branch?"; then
-      print_warning "Please apply any additional mods from $CURRENT_VERSION on top of $NEW_BRANCH"
-      prompt_action "Additional mods applied"
-    fi
+    print_error "Merge conflicts detected"
+    echo
+    echo "Conflicted files:"
+    git diff --name-only --diff-filter=U | while read file; do
+      echo "  - $file"
+    done
+    echo
+    echo "Options:"
+    echo "  1) Resolve conflicts manually (opens in another terminal), then continue"
+    echo "  2) Abort merge and skip your customizations (use upstream only)"
+    echo "  3) Abort script and resolve later"
+    echo
+    read -p "Choose option (1/2/3): " -r MERGE_OPTION
+
+    case "$MERGE_OPTION" in
+      1)
+        print_info "Please resolve conflicts in another terminal"
+        echo "After resolving, run: git add . && git commit"
+        prompt_action "Merge conflicts resolved and committed"
+        ;;
+      2)
+        print_warning "Aborting merge - your customizations will NOT be included"
+        git merge --abort
+        print_info "You can manually cherry-pick changes from $CURRENT_VERSION later if needed"
+        ;;
+      3)
+        print_error "Script aborted - merge in progress"
+        echo "To resolve later:"
+        echo "  1. Fix conflicts in the listed files"
+        echo "  2. Run: git add . && git commit"
+        echo "  3. Re-run this script"
+        exit 1
+        ;;
+      *)
+        print_error "Invalid option - aborting script"
+        exit 1
+        ;;
+    esac
   fi
 else
   print_warning "No previous version detected for merging"
