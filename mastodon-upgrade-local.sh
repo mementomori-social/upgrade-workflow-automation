@@ -858,9 +858,27 @@ else
   print_success "New branch created and checked out"
 fi
 
-if [[ -n "$CURRENT_VERSION" ]]; then
-  print_info "Attempting to merge $CURRENT_VERSION..."
-  if git merge "$CURRENT_VERSION"; then
+# Ask which branch to merge customizations from
+echo
+echo "Merge customizations from which branch?"
+echo "- Press Enter to use default: [$CURRENT_VERSION]"
+echo "- Type a branch name to merge from that instead"
+echo "- Type 'skip' to skip merging (use upstream only)"
+read -p "Branch: " -r MERGE_BRANCH_INPUT
+
+# Determine which branch to merge
+if [[ -z "$MERGE_BRANCH_INPUT" ]]; then
+  BRANCH_TO_MERGE="$CURRENT_VERSION"
+elif [[ "$MERGE_BRANCH_INPUT" == "skip" ]]; then
+  BRANCH_TO_MERGE=""
+  print_info "Skipping merge - using upstream only"
+else
+  BRANCH_TO_MERGE="$MERGE_BRANCH_INPUT"
+fi
+
+if [[ -n "$BRANCH_TO_MERGE" ]]; then
+  print_info "Attempting to merge $BRANCH_TO_MERGE..."
+  if git merge "$BRANCH_TO_MERGE"; then
     print_success "Merge successful"
   else
     print_error "Merge conflicts detected"
@@ -886,7 +904,7 @@ if [[ -n "$CURRENT_VERSION" ]]; then
       2)
         print_warning "Aborting merge - your customizations will NOT be included"
         git merge --abort
-        print_info "You can manually cherry-pick changes from $CURRENT_VERSION later if needed"
+        print_info "You can manually cherry-pick changes from $BRANCH_TO_MERGE later if needed"
         ;;
       3)
         print_error "Script aborted - merge in progress"
@@ -902,8 +920,6 @@ if [[ -n "$CURRENT_VERSION" ]]; then
         ;;
     esac
   fi
-else
-  print_warning "No previous version detected for merging"
 fi
 
 # Step 17: Update version in .env.production
