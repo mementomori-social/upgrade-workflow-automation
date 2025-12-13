@@ -172,6 +172,17 @@ format_size() {
 
 # Function to backup local development database
 backup_local_database() {
+  # Ensure PostgreSQL is running first
+  if ! systemctl is-active --quiet postgresql; then
+    print_info "Starting PostgreSQL for backup..."
+    sudo systemctl start postgresql
+    sleep 2
+    if ! systemctl is-active --quiet postgresql; then
+      print_warning "Could not start PostgreSQL, skipping automatic backup"
+      return 1
+    fi
+  fi
+
   print_info "Checking disk space for local database backup..."
 
   # Get database size
