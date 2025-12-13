@@ -1,6 +1,6 @@
 # Mastodon upgrade workflow automation
 
-![Version](https://img.shields.io/badge/version-1.1.4-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.1.5-blue?style=for-the-badge)
 ![Mastodon](https://img.shields.io/badge/-MASTODON-%236364FF?style=for-the-badge&logo=mastodon&logoColor=white)
 ![bash](https://img.shields.io/badge/bash-%23121011.svg?style=for-the-badge&color=%23222222&logo=gnu-bash&logoColor=white)
 ![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
