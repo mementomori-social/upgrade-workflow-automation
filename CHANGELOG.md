@@ -1,5 +1,6 @@
 ### 1.1.5: 2025-12-13
 
+* Add nginx to required services check at startup
 * Start PostgreSQL automatically before attempting local database backup
 * Use GB for disk space display when sizes >= 1000MB for better readability
 

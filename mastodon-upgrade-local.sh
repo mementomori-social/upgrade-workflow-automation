@@ -346,8 +346,8 @@ SERVICES_TO_START=""
 SIDEKIQ_SERVICES=$(get_sidekiq_services)
 print_info "Detected sidekiq services: $SIDEKIQ_SERVICES"
 
-# Check web and streaming services
-for service in mastodon-web mastodon-streaming; do
+# Check nginx, web and streaming services
+for service in nginx mastodon-web mastodon-streaming; do
   if systemctl is-active --quiet "$service"; then
     print_success "$service is already running"
   else
