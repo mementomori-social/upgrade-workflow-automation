@@ -287,10 +287,13 @@ SCRIPT_DATE=$(echo "$SCRIPT_VERSION_LINE" | grep -o '[0-9]\{4\}-[0-9]\{2\}-[0-9]
 print_info "Mastodon local development upgrade script ${BLUE}v$SCRIPT_VERSION ($SCRIPT_DATE)${NC}"
 print_info "Starting upgrade process for local development environment"
 
-# Step 0a: Local development database backup (automatic)
+# Step 0a: Local development database backup (optional)
 echo
-print_info "Creating local development database backup first..."
-backup_local_database
+if confirm "Create local development database backup first?"; then
+  backup_local_database
+else
+  print_info "Skipping local database backup"
+fi
 
 # Step 0b: Production database backup (manual - takes longest)
 echo
