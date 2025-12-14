@@ -1,3 +1,8 @@
+### 1.1.6: 2025-12-14
+
+* Show which command failed when build steps error (displays "Command failed: <command>")
+* Add progress indicators for build steps during recompile after merge
+
 ### 1.1.5: 2025-12-13
 
 * Add nginx to required services check at startup
