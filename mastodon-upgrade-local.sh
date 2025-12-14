@@ -84,6 +84,15 @@ confirm() {
   [[ $REPLY =~ ^[Yy]$ ]]
 }
 
+# Function to run a command and show which command failed
+run_cmd() {
+  local cmd="$1"
+  if ! eval "$cmd"; then
+    print_error "Command failed: $cmd"
+    return 1
+  fi
+}
+
 # Function to check for unstaged changes and offer to stash
 check_and_stash_changes() {
   # Check for incomplete merge first
@@ -732,13 +741,13 @@ fi
 check_and_fix_native_gems
 
 echo -e "${YELLOW}  ⏳ Running bundle install...${NC}"
-bundle install
+run_cmd "bundle install"
 echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
 # Set corepack to auto-confirm downloads
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-yarn install --immutable
+run_cmd "yarn install --immutable"
 echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
-RAILS_ENV=development bundle exec rails assets:precompile
+run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
 print_success "Build completed"
 
 # Step 7: Check migrations
@@ -974,9 +983,12 @@ fi
 # Check for ICU library compatibility issues before bundle install
 check_and_fix_native_gems
 
-bundle install
-yarn install --immutable
-RAILS_ENV=development bundle exec rails assets:precompile
+echo -e "${YELLOW}  ⏳ Running bundle install...${NC}"
+run_cmd "bundle install"
+echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
+run_cmd "yarn install --immutable"
+echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
+run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
 
 # Clear toot cache before restart
 print_info "Clearing toot cache..."
