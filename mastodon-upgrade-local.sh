@@ -801,7 +801,7 @@ if confirm "Reset and rebuild search index?"; then
   # Start Elasticsearch if needed
   if ! systemctl is-active --quiet elasticsearch; then
     print_info "Starting Elasticsearch..."
-    sudo service elasticsearch start
+    sudo systemctl start elasticsearch
     sleep 5
   fi
   
