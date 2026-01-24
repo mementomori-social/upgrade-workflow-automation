@@ -801,17 +801,28 @@ if confirm "Reset and rebuild search index?"; then
   # Start Elasticsearch if needed
   if ! systemctl is-active --quiet elasticsearch; then
     print_info "Starting Elasticsearch..."
-    sudo systemctl start elasticsearch
-    sleep 5
+    if ! sudo systemctl start elasticsearch; then
+      print_error "Failed to start Elasticsearch"
+      if ! confirm "Continue without search index rebuild?"; then
+        exit 1
+      fi
+    else
+      sleep 5
+    fi
   fi
-  
-  print_info "Resetting search index..."
-  RAILS_ENV=development bin/tootctl search deploy --reset-chewy
 
-  print_info "Rebuilding search index (this may take a while)..."
-  RAILS_ENV=development bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096
-  RAILS_ENV=development bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096
-  print_success "Search index rebuilt"
+  # Only proceed with search rebuild if elasticsearch is running
+  if systemctl is-active --quiet elasticsearch; then
+    print_info "Resetting search index..."
+    RAILS_ENV=development bin/tootctl search deploy --reset-chewy
+
+    print_info "Rebuilding search index (this may take a while)..."
+    RAILS_ENV=development bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096
+    RAILS_ENV=development bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096
+    print_success "Search index rebuilt"
+  else
+    print_warning "Skipping search index rebuild (Elasticsearch not running)"
+  fi
 fi
 
 # Step 13: Final restart
