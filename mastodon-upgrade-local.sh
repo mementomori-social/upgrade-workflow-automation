@@ -38,6 +38,12 @@ elif [[ -f "$SCRIPT_DIR/.env" ]]; then
   source "$SCRIPT_DIR/.env"
 fi
 
+# Ensure rbenv is available (non-interactive shells don't source .bashrc)
+if [[ -d "$HOME/.rbenv/bin" ]]; then
+  export PATH="$HOME/.rbenv/bin:$PATH"
+  eval "$(rbenv init -)"
+fi
+
 # Default configuration (can be overridden by .env.development or .env)
 MASTODON_DIR="${MASTODON_DIR:-/opt/mastodon}"
 MASTODON_USER="${MASTODON_USER:-mastodon}"
