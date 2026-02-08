@@ -41,7 +41,7 @@ fi
 # Ensure rbenv is available (non-interactive shells don't source .bashrc)
 if [[ -d "$HOME/.rbenv/bin" ]]; then
   export PATH="$HOME/.rbenv/bin:$PATH"
-  eval "$(rbenv init -)"
+  eval "$(rbenv init - 2>/dev/null)" || true
 fi
 
 # Default configuration (can be overridden by .env.development or .env)
