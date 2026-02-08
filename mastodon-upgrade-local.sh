@@ -903,9 +903,22 @@ else
 fi
 
 if [[ -n "$BRANCH_TO_MERGE" ]]; then
+  # Stash any uncommitted changes before merge to prevent "local changes would be overwritten"
+  MERGE_STASH=""
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    print_info "Stashing uncommitted changes before merge..."
+    git stash push -m "Auto-stash before merge on $(date '+%Y-%m-%d %H:%M:%S')"
+    MERGE_STASH="yes"
+  fi
+
   print_info "Attempting to merge $BRANCH_TO_MERGE..."
   if git merge "$BRANCH_TO_MERGE"; then
     print_success "Merge successful"
+    # Restore stashed changes if any
+    if [[ "$MERGE_STASH" == "yes" ]]; then
+      print_info "Restoring stashed changes..."
+      git stash pop || print_warning "Could not auto-restore stashed changes (run 'git stash pop' manually)"
+    fi
   else
     print_error "Merge conflicts detected"
     echo
@@ -916,7 +929,7 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
     echo
     echo "Options:"
     echo "  1) Resolve conflicts manually (opens in another terminal), then continue"
-    echo "  2) Abort merge and skip your customizations (use upstream only)"
+    echo "  2) Use upstream only (discard your customizations and continue)"
     echo "  3) Abort script and resolve later"
     echo
     read -p "Choose option (1/2/3): " -r MERGE_OPTION
@@ -926,11 +939,21 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
         print_info "Please resolve conflicts in another terminal"
         echo "After resolving, run: git add . && git commit"
         prompt_action "Merge conflicts resolved and committed"
+        # Restore stashed changes if any
+        if [[ "$MERGE_STASH" == "yes" ]]; then
+          print_info "Restoring stashed changes..."
+          git stash pop || print_warning "Could not auto-restore stashed changes (run 'git stash pop' manually)"
+        fi
         ;;
       2)
-        print_warning "Aborting merge - your customizations will NOT be included"
-        git merge --abort
+        print_warning "Aborting merge - continuing with upstream only"
+        git merge --abort 2>/dev/null || git reset --hard HEAD
         print_info "You can manually cherry-pick changes from $BRANCH_TO_MERGE later if needed"
+        # Restore stashed changes if any
+        if [[ "$MERGE_STASH" == "yes" ]]; then
+          print_info "Restoring stashed changes..."
+          git stash pop || print_warning "Could not auto-restore stashed changes (run 'git stash pop' manually)"
+        fi
         ;;
       3)
         print_error "Script aborted - merge in progress"
@@ -938,6 +961,9 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
         echo "  1. Fix conflicts in the listed files"
         echo "  2. Run: git add . && git commit"
         echo "  3. Re-run this script"
+        if [[ "$MERGE_STASH" == "yes" ]]; then
+          echo "  Note: You have stashed changes. Run 'git stash pop' after resolving."
+        fi
         exit 1
         ;;
       *)
