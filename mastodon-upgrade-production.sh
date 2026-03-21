@@ -303,11 +303,33 @@ if [[ -f "$PRODUCTION_MASTODON_DIR/.git/MERGE_HEAD" ]]; then
   fi
 fi
 
+# Stash any uncommitted changes before switching branches
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  print_warning "Uncommitted changes detected in working directory"
+  if confirm "Stash these changes before proceeding?"; then
+    git stash push -m "Auto-stash before production upgrade on $(date '+%Y-%m-%d %H:%M:%S')"
+    print_success "Changes stashed (restore later with: git stash pop)"
+  else
+    print_error "Cannot proceed with uncommitted changes"
+    echo "Please stash or commit your changes first"
+    exit 1
+  fi
+fi
+
 # Step 2: Fetch changes
 print_info "Fetching changes from $UPSTREAM_REMOTE..."
 git fetch --all
-git checkout -b "$UPSTREAM_REMOTE/$NEW_BRANCH"
-git pull $UPSTREAM_REMOTE "$NEW_BRANCH" --rebase
+
+# Create or reset the local branch for the new deployment
+LOCAL_BRANCH="$UPSTREAM_REMOTE/$NEW_BRANCH"
+if git show-ref --verify --quiet "refs/heads/$LOCAL_BRANCH"; then
+  print_warning "Local branch '$LOCAL_BRANCH' already exists (from a previous run?)"
+  print_info "Resetting it to track the latest remote changes..."
+  git checkout "$LOCAL_BRANCH"
+  git reset --hard "$UPSTREAM_REMOTE/$NEW_BRANCH"
+else
+  git checkout -b "$LOCAL_BRANCH" "$UPSTREAM_REMOTE/$NEW_BRANCH"
+fi
 print_success "Changes fetched and branch checked out"
 
 # Step 3: Verify changes
