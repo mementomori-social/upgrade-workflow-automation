@@ -99,6 +99,22 @@ run_cmd() {
   fi
 }
 
+# Free port 3000 if something else is using it (e.g. leftover dev server)
+free_port_3000() {
+  local pid
+  pid=$(sudo lsof -ti :3000 2>/dev/null | head -1)
+  if [[ -n "$pid" ]]; then
+    local cmd
+    cmd=$(ps -p "$pid" -o comm= 2>/dev/null)
+    # Don't kill puma (mastodon-web itself)
+    if [[ "$cmd" != "bundle" && "$cmd" != "ruby" && "$cmd" != "puma" ]]; then
+      print_warning "Port 3000 is in use by $cmd (PID $pid), killing it..."
+      sudo kill "$pid" 2>/dev/null
+      sleep 1
+    fi
+  fi
+}
+
 # Function to check for unstaged changes and offer to stash
 check_and_stash_changes() {
   # Check for incomplete merge first
@@ -779,6 +795,7 @@ if confirm "Clear cache before restart?"; then
 fi
 
 # Step 10: Restart services
+free_port_3000
 print_info "Restarting Mastodon services..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
@@ -832,6 +849,7 @@ if confirm "Reset and rebuild search index?"; then
 fi
 
 # Step 13: Final restart
+free_port_3000
 print_info "Final restart of services..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
@@ -931,8 +949,10 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
     echo "  1) Resolve conflicts manually (opens in another terminal), then continue"
     echo "  2) Use upstream only (discard your customizations and continue)"
     echo "  3) Abort script and resolve later"
+    echo "  4) Use Claude Code workflow (default)"
     echo
-    read -p "Choose option (1/2/3): " -r MERGE_OPTION
+    read -p "Choose option (1/2/3/4) [4]: " -r MERGE_OPTION
+    MERGE_OPTION="${MERGE_OPTION:-4}"
 
     case "$MERGE_OPTION" in
       1)
@@ -965,6 +985,62 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
           echo "  Note: You have stashed changes. Run 'git stash pop' after resolving."
         fi
         exit 1
+        ;;
+      4)
+        print_info "Launching Claude Code to resolve merge conflicts..."
+        echo
+        CONFLICTED_FILES=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
+        print_info "Claude will resolve conflicts in: $CONFLICTED_FILES"
+        echo
+
+        # Resolve each conflicted file with Claude
+        for conflict_file in $CONFLICTED_FILES; do
+          echo
+          print_info "Resolving: $conflict_file"
+          claude -p "You are resolving merge conflicts in a Mastodon fork. The file '$conflict_file' has merge conflicts. Here is the file content:
+
+$(cat "$conflict_file")
+
+Resolve the merge conflicts by keeping BOTH upstream changes and our fork's customizations where possible. For db/schema.rb, keep the version with the most columns/features. For code files, integrate both sides. For locale files, keep all translations. Output ONLY the resolved file content with NO conflict markers, NO explanation, NO markdown fences." > "/tmp/claude_resolved_$(basename "$conflict_file")"
+
+          if [[ $? -eq 0 ]] && [[ -s "/tmp/claude_resolved_$(basename "$conflict_file")" ]]; then
+            cp "/tmp/claude_resolved_$(basename "$conflict_file")" "$conflict_file"
+            print_success "Resolved: $conflict_file"
+          else
+            print_error "Claude could not resolve: $conflict_file"
+            print_info "Please resolve this file manually"
+          fi
+        done
+
+        echo
+        print_info "Claude's resolutions - please review:"
+        echo
+        git diff --stat
+        echo
+
+        # Show each resolved file for confirmation
+        for conflict_file in $CONFLICTED_FILES; do
+          echo
+          print_warning "Review: $conflict_file"
+          # Show a short diff context
+          git diff "$conflict_file" | head -40
+          echo "  ..."
+          echo
+          if ! confirm "Accept resolution for $conflict_file?"; then
+            print_info "Opening $conflict_file for manual editing..."
+            "${EDITOR:-nano}" "$conflict_file"
+          fi
+          git add "$conflict_file"
+        done
+
+        git commit -m "Merge $BRANCH_TO_MERGE into $NEW_BRANCH (conflicts resolved via Claude Code)"
+        print_success "Merge conflicts resolved and committed"
+
+        # Restore stashed changes if any
+        if [[ "$MERGE_STASH" == "yes" ]]; then
+          print_info "Restoring stashed changes..."
+          git stash pop || print_warning "Could not auto-restore stashed changes (run 'git stash pop' manually)"
+        fi
         ;;
       *)
         print_error "Invalid option - aborting script"
@@ -1037,6 +1113,7 @@ run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
 print_info "Clearing toot cache..."
 RAILS_ENV=development /opt/mastodon/bin/tootctl cache clear
 
+free_port_3000
 print_info "Restarting services (this may take a moment)..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
