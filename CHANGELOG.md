@@ -5,6 +5,7 @@
 * Free port 3000 from leftover processes before restarting mastodon-web
 * Fix rbenv not available in non-interactive shells (bundle: command not found)
 * Fix merge abort failing when merge never started (MERGE_HEAD missing)
+* Production script: auto-stash uncommitted changes and handle pre-existing branch from failed runs
 
 ### 1.1.6: 2025-12-14
 
