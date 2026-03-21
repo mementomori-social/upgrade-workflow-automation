@@ -1,6 +1,6 @@
 # Mastodon upgrade workflow automation
 
-![Version](https://img.shields.io/badge/version-1.1.6-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.2.0-blue?style=for-the-badge)
 ![Mastodon](https://img.shields.io/badge/-MASTODON-%236364FF?style=for-the-badge&logo=mastodon&logoColor=white)
 ![bash](https://img.shields.io/badge/bash-%23121011.svg?style=for-the-badge&color=%23222222&logo=gnu-bash&logoColor=white)
 ![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
@@ -53,6 +53,7 @@ bash mastodon-bird-ui-update.sh
 - **Search index rebuilding** - Manages Elasticsearch index updates
 - **Upgrade logging** - Tracks upgrade history for documentation
 - **Safety confirmations** - Production-safe with multiple confirmation prompts
+- **Claude Code merge resolution** - AI-powered merge conflict resolution with per-file review
 
 ## Scripts
 
@@ -104,6 +105,7 @@ This automation expects specific Mastodon installation setups:
 - **Yarn** - Package manager (managed by corepack)
 - **PostgreSQL client** - For database operations
 - **GitHub CLI** (optional) - For automated fork syncing: `sudo apt install gh`
+- **Claude Code** (optional) - For AI-powered merge conflict resolution: [claude.ai/claude-code](https://claude.ai/claude-code)
 
 ### Permissions
 

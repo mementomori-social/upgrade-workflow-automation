@@ -1,3 +1,11 @@
+### 1.2.0: 2026-03-21
+
+* Add Claude Code workflow for automatic merge conflict resolution (option 4, default)
+* Stash uncommitted changes before merge to prevent false "local changes would be overwritten" errors
+* Free port 3000 from leftover processes before restarting mastodon-web
+* Fix rbenv not available in non-interactive shells (bundle: command not found)
+* Fix merge abort failing when merge never started (MERGE_HEAD missing)
+
 ### 1.1.6: 2025-12-14
 
 * Show which command failed when build steps error (displays "Command failed: <command>")
