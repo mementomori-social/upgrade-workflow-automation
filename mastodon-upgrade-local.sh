@@ -993,47 +993,28 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
         print_info "Claude will resolve conflicts in: $CONFLICTED_FILES"
         echo
 
-        # Resolve each conflicted file with Claude
-        for conflict_file in $CONFLICTED_FILES; do
-          echo
-          print_info "Resolving: $conflict_file"
-          claude -p "You are resolving merge conflicts in a Mastodon fork. The file '$conflict_file' has merge conflicts. Here is the file content:
+        # Launch Claude interactively — it can see everything, read/edit files,
+        # and the user sees full thinking and progress.
+        claude --dangerously-skip-permissions "This Mastodon fork repo has merge conflicts in these files: ${CONFLICTED_FILES}
 
-$(cat "$conflict_file")
+Resolve ALL merge conflicts by keeping BOTH upstream changes and our fork's customizations where possible. Rules:
+- For locale files: keep all translations from both sides
+- For db/schema.rb: keep the version with the most columns/features
+- For code files: integrate both sides
+- Use the Edit tool to fix each conflict in place
+- After resolving, verify no conflict markers (<<<<<<< / ======= / >>>>>>>) remain in any file
+- Then run: git add ${CONFLICTED_FILES}"
 
-Resolve the merge conflicts by keeping BOTH upstream changes and our fork's customizations where possible. For db/schema.rb, keep the version with the most columns/features. For code files, integrate both sides. For locale files, keep all translations. Output ONLY the resolved file content with NO conflict markers, NO explanation, NO markdown fences." > "/tmp/claude_resolved_$(basename "$conflict_file")"
+        # Verify all conflicts are resolved
+        REMAINING=$(git diff --name-only --diff-filter=U 2>/dev/null | wc -l)
+        if [[ "$REMAINING" -gt 0 ]]; then
+          print_error "Some conflicts remain unresolved:"
+          git diff --name-only --diff-filter=U
+          print_info "Please resolve manually, then: git add <files> && git commit"
+          exit 1
+        fi
 
-          if [[ $? -eq 0 ]] && [[ -s "/tmp/claude_resolved_$(basename "$conflict_file")" ]]; then
-            cp "/tmp/claude_resolved_$(basename "$conflict_file")" "$conflict_file"
-            print_success "Resolved: $conflict_file"
-          else
-            print_error "Claude could not resolve: $conflict_file"
-            print_info "Please resolve this file manually"
-          fi
-        done
-
-        echo
-        print_info "Claude's resolutions - please review:"
-        echo
-        git diff --stat
-        echo
-
-        # Show each resolved file for confirmation
-        for conflict_file in $CONFLICTED_FILES; do
-          echo
-          print_warning "Review: $conflict_file"
-          # Show a short diff context
-          git diff "$conflict_file" | head -40
-          echo "  ..."
-          echo
-          if ! confirm "Accept resolution for $conflict_file?"; then
-            print_info "Opening $conflict_file for manual editing..."
-            "${EDITOR:-nano}" "$conflict_file"
-          fi
-          git add "$conflict_file"
-        done
-
-        git commit -m "Merge $BRANCH_TO_MERGE into $NEW_BRANCH (conflicts resolved via Claude Code)"
+        HUSKY=0 git commit -m "Merge $BRANCH_TO_MERGE into $NEW_BRANCH (conflicts resolved)"
         print_success "Merge conflicts resolved and committed"
 
         # Restore stashed changes if any
