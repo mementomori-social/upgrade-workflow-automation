@@ -1,3 +1,8 @@
+### 1.3.0: 2026-04-06
+
+* Replace per-file `claude -p` conflict resolution with interactive `claude` session (fixes ARG_MAX crash on large files like fi.yml)
+* Skip husky pre-commit hooks on merge commits with `HUSKY=0`
+
 ### 1.2.0: 2026-03-21
 
 * Add Claude Code workflow for automatic merge conflict resolution (option 4, default)
