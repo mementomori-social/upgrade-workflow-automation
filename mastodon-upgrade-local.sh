@@ -276,6 +276,14 @@ backup_local_database() {
 check_and_fix_native_gems() {
   print_info "Checking native gem compatibility..."
 
+  # ICU 78+ requires C++20 for charlock_holmes compilation
+  local icu_major
+  icu_major=$(pkg-config --modversion icu-uc 2>/dev/null | cut -d. -f1)
+  if [[ -n "$icu_major" ]] && [[ "$icu_major" -ge 78 ]]; then
+    print_info "ICU $icu_major detected, setting C++20 flag for charlock_holmes..."
+    bundle config build.charlock_holmes --with-cxxflags='-std=c++20'
+  fi
+
   # Try to load charlock_holmes to detect ICU version mismatches
   if ! bundle exec ruby -e "require 'charlock_holmes'" 2>/dev/null; then
     local error_output=$(bundle exec ruby -e "require 'charlock_holmes'" 2>&1)
