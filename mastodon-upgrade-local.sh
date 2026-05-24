@@ -119,15 +119,16 @@ check_custom_imports() {
   for file in $all_files; do
     [[ -f "$MASTODON_DIR/$file" ]] || continue
     # Extract npm package imports (skip relative and mastodon/ imports)
+    # For scoped packages (@foo/bar), keep @foo/bar as the package name
     local imports=$(grep -oP "from ['\"]\\K[^'\"./][^'\"]*" "$MASTODON_DIR/$file" 2>/dev/null \
-      | sed 's|/.*||' \
+      | sed -E 's|^(@[^/]+/[^/]+).*|\1|; t; s|/.*||' \
       | grep -v '^mastodon$' \
       | sort -u)
     for pkg in $imports; do
-      # Check if package exists in package.json or node_modules
       if ! grep -q "\"$pkg\"" "$pkg_json" 2>/dev/null && \
          ! [[ -d "$MASTODON_DIR/node_modules/$pkg" ]]; then
         print_warning "Broken import: '$pkg' in $file (not in package.json)"
+        print_info "  Suggested fix: check what replaced '$pkg' in upstream and update the import"
         broken=1
       fi
     done
@@ -135,7 +136,11 @@ check_custom_imports() {
 
   if [[ "$broken" -eq 1 ]]; then
     print_error "Broken imports detected — build will likely fail"
-    print_info "Fix the imports above before continuing"
+    echo ""
+    echo "How to fix: open another terminal and update the imports listed above."
+    echo "Typically upstream renamed a package — check what other files import"
+    echo "the same thing with: grep -r 'Helmet\\|whatever' app/javascript/ --include='*.tsx' | head"
+    echo ""
     if ! confirm "Continue anyway?"; then
       exit 1
     fi
