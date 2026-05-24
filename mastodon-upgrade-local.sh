@@ -100,6 +100,50 @@ run_cmd() {
   fi
 }
 
+# Check custom mod files for imports that no longer exist in package.json
+check_custom_imports() {
+  print_info "Checking custom mod files for broken imports..."
+  local broken=0
+  local pkg_json="$MASTODON_DIR/package.json"
+
+  # Files that are custom mods (not from upstream)
+  local custom_files=$(cd "$MASTODON_DIR" && git log --diff-filter=A --name-only --format="" mementomods-* 2>/dev/null \
+    | grep -E '\.(jsx|tsx|js|ts)$' | sort -u)
+
+  # Also check files modified in mementomods branches
+  local modified_files=$(cd "$MASTODON_DIR" && git diff --name-only HEAD~1 2>/dev/null \
+    | grep -E '\.(jsx|tsx|js|ts)$')
+
+  local all_files=$(echo -e "$custom_files\n$modified_files" | sort -u | grep -v '^$')
+
+  for file in $all_files; do
+    [[ -f "$MASTODON_DIR/$file" ]] || continue
+    # Extract npm package imports (skip relative and mastodon/ imports)
+    local imports=$(grep -oP "from ['\"]\\K[^'\"./][^'\"]*" "$MASTODON_DIR/$file" 2>/dev/null \
+      | sed 's|/.*||' \
+      | grep -v '^mastodon$' \
+      | sort -u)
+    for pkg in $imports; do
+      # Check if package exists in package.json or node_modules
+      if ! grep -q "\"$pkg\"" "$pkg_json" 2>/dev/null && \
+         ! [[ -d "$MASTODON_DIR/node_modules/$pkg" ]]; then
+        print_warning "Broken import: '$pkg' in $file (not in package.json)"
+        broken=1
+      fi
+    done
+  done
+
+  if [[ "$broken" -eq 1 ]]; then
+    print_error "Broken imports detected — build will likely fail"
+    print_info "Fix the imports above before continuing"
+    if ! confirm "Continue anyway?"; then
+      exit 1
+    fi
+  else
+    print_success "All imports look valid"
+  fi
+}
+
 # Free web port if something is using it (e.g. leftover dev server or stale puma)
 free_web_port() {
   local pids
@@ -789,6 +833,7 @@ echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
 # Set corepack to auto-confirm downloads
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 run_cmd "yarn install --immutable"
+check_custom_imports
 echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
 run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
 print_success "Build completed"
@@ -1108,6 +1153,7 @@ echo -e "${YELLOW}  ⏳ Running bundle install...${NC}"
 run_cmd "bundle install"
 echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
 run_cmd "yarn install --immutable"
+check_custom_imports
 echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
 run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
 

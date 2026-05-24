@@ -128,6 +128,46 @@ get_sidekiq_services() {
   fi
 }
 
+# Check custom mod files for imports that no longer exist in package.json
+check_custom_imports() {
+  print_info "Checking custom mod files for broken imports..."
+  local broken=0
+  local pkg_json="$MASTODON_DIR/package.json"
+
+  local custom_files=$(cd "$MASTODON_DIR" && git log --diff-filter=A --name-only --format="" mementomods-* 2>/dev/null \
+    | grep -E '\.(jsx|tsx|js|ts)$' | sort -u)
+
+  local modified_files=$(cd "$MASTODON_DIR" && git diff --name-only HEAD~1 2>/dev/null \
+    | grep -E '\.(jsx|tsx|js|ts)$')
+
+  local all_files=$(echo -e "$custom_files\n$modified_files" | sort -u | grep -v '^$')
+
+  for file in $all_files; do
+    [[ -f "$MASTODON_DIR/$file" ]] || continue
+    local imports=$(grep -oP "from ['\"]\\K[^'\"./][^'\"]*" "$MASTODON_DIR/$file" 2>/dev/null \
+      | sed 's|/.*||' \
+      | grep -v '^mastodon$' \
+      | sort -u)
+    for pkg in $imports; do
+      if ! grep -q "\"$pkg\"" "$pkg_json" 2>/dev/null && \
+         ! [[ -d "$MASTODON_DIR/node_modules/$pkg" ]]; then
+        print_warning "Broken import: '$pkg' in $file (not in package.json)"
+        broken=1
+      fi
+    done
+  done
+
+  if [[ "$broken" -eq 1 ]]; then
+    print_error "Broken imports detected — build will likely fail"
+    print_info "Fix the imports above before continuing"
+    if ! confirm "Continue anyway?"; then
+      exit 1
+    fi
+  else
+    print_success "All imports look valid"
+  fi
+}
+
 # Function to check and fix ICU library issues with native gems
 check_and_fix_native_gems() {
   print_info "Checking native gem compatibility..."
@@ -420,6 +460,7 @@ check_and_fix_native_gems
 
 bundle install
 yarn install --immutable
+check_custom_imports
 RAILS_ENV=production bundle exec rails assets:precompile
 print_success "Application rebuilt"
 
