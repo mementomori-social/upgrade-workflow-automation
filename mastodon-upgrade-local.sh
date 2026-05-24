@@ -59,6 +59,7 @@ STATUS_URL="${STATUS_URL:-https://status.your-instance.com}"
 MAINTENANCE_URL="${MAINTENANCE_URL:-https://your-status-page-url/maintenances}"
 LOCAL_BACKUP_DIR="${LOCAL_BACKUP_DIR:-$SCRIPT_DIR}"
 LOCAL_DB_NAME="${LOCAL_DB_NAME:-mastodon_development}"
+WEB_PORT="${WEB_PORT:-3000}"
 
 # Function to print colored messages
 print_info() {
@@ -99,19 +100,18 @@ run_cmd() {
   fi
 }
 
-# Free port 3000 if something else is using it (e.g. leftover dev server)
-free_port_3000() {
-  local pid
-  pid=$(sudo lsof -ti :3000 2>/dev/null | head -1)
-  if [[ -n "$pid" ]]; then
-    local cmd
-    cmd=$(ps -p "$pid" -o comm= 2>/dev/null)
-    # Don't kill puma (mastodon-web itself)
-    if [[ "$cmd" != "bundle" && "$cmd" != "ruby" && "$cmd" != "puma" ]]; then
-      print_warning "Port 3000 is in use by $cmd (PID $pid), killing it..."
+# Free web port if something is using it (e.g. leftover dev server or stale puma)
+free_web_port() {
+  local pids
+  pids=$(sudo lsof -ti :"$WEB_PORT" 2>/dev/null)
+  if [[ -n "$pids" ]]; then
+    for pid in $pids; do
+      local cmd
+      cmd=$(ps -p "$pid" -o comm= 2>/dev/null)
+      print_warning "Port $WEB_PORT is in use by $cmd (PID $pid), killing it..."
       sudo kill "$pid" 2>/dev/null
-      sleep 1
-    fi
+    done
+    sleep 2
   fi
 }
 
@@ -372,6 +372,9 @@ echo "We'll be performing Mastodon software upgrades soon. May cause some visibl
 echo
 prompt_action "Announcements created"
 
+# Free port 3000 before starting services
+free_web_port
+
 # Check and start services automatically
 print_info "Checking and starting required services..."
 SERVICES_TO_START=""
@@ -401,16 +404,26 @@ for service in $SIDEKIQ_SERVICES; do
 done
 
 if [[ -n "$SERVICES_TO_START" ]]; then
-  print_info "Starting services:$SERVICES_TO_START"
-  sudo systemctl start $SERVICES_TO_START
-  sleep 3
-  
-  # Verify they started
   for service in $SERVICES_TO_START; do
-    if systemctl is-active --quiet "$service"; then
-      print_success "$service started successfully"
+    print_info "Starting $service..."
+    if sudo systemctl start "$service"; then
+      sleep 2
+      if systemctl is-active --quiet "$service"; then
+        print_success "$service started successfully"
+      else
+        print_error "Failed to start $service"
+        echo "--- journalctl -u $service (last 10 lines) ---"
+        sudo journalctl -u "$service" --no-pager -n 10
+        echo "---"
+        if ! confirm "Continue anyway?"; then
+          exit 1
+        fi
+      fi
     else
       print_error "Failed to start $service"
+      echo "--- journalctl -u $service (last 10 lines) ---"
+      sudo journalctl -u "$service" --no-pager -n 10
+      echo "---"
       if ! confirm "Continue anyway?"; then
         exit 1
       fi
@@ -795,7 +808,7 @@ if confirm "Clear cache before restart?"; then
 fi
 
 # Step 10: Restart services
-free_port_3000
+free_web_port
 print_info "Restarting Mastodon services..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
@@ -849,7 +862,7 @@ if confirm "Reset and rebuild search index?"; then
 fi
 
 # Step 13: Final restart
-free_port_3000
+free_web_port
 print_info "Final restart of services..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
@@ -1094,7 +1107,7 @@ run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
 print_info "Clearing toot cache..."
 RAILS_ENV=development /opt/mastodon/bin/tootctl cache clear
 
-free_port_3000
+free_web_port
 print_info "Restarting services (this may take a moment)..."
 if command -v restart-mastodon &> /dev/null; then
   restart-mastodon
