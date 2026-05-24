@@ -103,13 +103,13 @@ run_cmd() {
 # Free web port if something is using it (e.g. leftover dev server or stale puma)
 free_web_port() {
   local pids
-  pids=$(sudo lsof -ti :"$WEB_PORT" 2>/dev/null)
+  pids=$(sudo lsof -ti :"$WEB_PORT" 2>/dev/null || true)
   if [[ -n "$pids" ]]; then
     for pid in $pids; do
       local cmd
-      cmd=$(ps -p "$pid" -o comm= 2>/dev/null)
+      cmd=$(ps -p "$pid" -o comm= 2>/dev/null || true)
       print_warning "Port $WEB_PORT is in use by $cmd (PID $pid), killing it..."
-      sudo kill "$pid" 2>/dev/null
+      sudo kill "$pid" 2>/dev/null || true
     done
     sleep 2
   fi
