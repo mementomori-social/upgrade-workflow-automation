@@ -144,9 +144,13 @@ check_custom_imports() {
 
   for file in $all_files; do
     [[ -f "$MASTODON_DIR/$file" ]] || continue
+    # Extract npm package imports (skip relative, mastodon/ and @/ path-alias imports)
+    # For scoped packages (@foo/bar), keep @foo/bar as the package name.
+    # @/... is a tsconfig path alias to app/javascript/, not a scoped package,
+    # so it collapses to bare "@" after the sed strip and must be excluded too.
     local imports=$(grep -oP "from ['\"]\\K[^'\"./][^'\"]*" "$MASTODON_DIR/$file" 2>/dev/null \
       | sed -E 's|^(@[^/]+/[^/]+).*|\1|; t; s|/.*||' \
-      | grep -v '^mastodon$' \
+      | grep -vE '^(mastodon|@)$' \
       | sort -u)
     for pkg in $imports; do
       if ! grep -q "\"$pkg\"" "$pkg_json" 2>/dev/null && \

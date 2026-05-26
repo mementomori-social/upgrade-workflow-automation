@@ -1,3 +1,7 @@
+### 1.3.1: 2026-05-26
+
+* Fix false positive "Broken import: '@'" when checking files that use the `@/` tsconfig path alias
+
 ### 1.3.0: 2026-04-06
 
 * Replace per-file `claude -p` conflict resolution with interactive `claude` session (fixes ARG_MAX crash on large files like fi.yml)
