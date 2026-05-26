@@ -126,9 +126,25 @@ check_custom_imports() {
       | sed -E 's|^(@[^/]+/[^/]+).*|\1|; t; s|/.*||' \
       | grep -vE '^(mastodon|@)$' \
       | sort -u)
+    # Lazily compute whether this file is orphaned (no other file imports it).
+    # Orphaned fork files are dead code that Vite tree-shakes, so their broken
+    # imports do not actually fail the build. Typical case: a fork override of
+    # an upstream file that upstream has since removed.
+    local file_module="${file#app/javascript/}"
+    file_module="${file_module%.*}"
+    local file_refs=""
     for pkg in $imports; do
       if ! grep -q "\"$pkg\"" "$pkg_json" 2>/dev/null && \
          ! [[ -d "$MASTODON_DIR/node_modules/$pkg" ]]; then
+        if [[ -z "$file_refs" ]]; then
+          file_refs=$(grep -rlE "from ['\"](@/)?${file_module}['\"]" "$MASTODON_DIR/app/javascript/" \
+                        --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' 2>/dev/null \
+                      | grep -v "^${MASTODON_DIR}/${file}$" || echo "__none__")
+        fi
+        if [[ "$file_refs" == "__none__" ]]; then
+          print_info "Stale fork file (no imports reference it), broken '$pkg' will be tree-shaken: $file"
+          continue
+        fi
         print_warning "Broken import: '$pkg' in $file (not in package.json)"
         print_info "  Suggested fix: check what replaced '$pkg' in upstream and update the import"
         broken=1
