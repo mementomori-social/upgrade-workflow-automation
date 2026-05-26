@@ -1,3 +1,7 @@
+### 1.3.2: 2026-05-26
+
+* Downgrade broken-import warning to INFO when the importing file is orphaned (no other file references it), since Vite tree-shakes it and the build is not affected
+
 ### 1.3.1: 2026-05-26
 
 * Fix false positive "Broken import: '@'" when checking files that use the `@/` tsconfig path alias
