@@ -1091,8 +1091,6 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
         print_info "Claude will resolve conflicts in: $CONFLICTED_FILES"
         echo
 
-        # Launch Claude interactively — it can see everything, read/edit files,
-        # and the user sees full thinking and progress.
         claude --dangerously-skip-permissions "This Mastodon fork repo has merge conflicts in these files: ${CONFLICTED_FILES}
 
 Resolve ALL merge conflicts by keeping BOTH upstream changes and our fork's customizations where possible. Rules:
@@ -1101,19 +1099,32 @@ Resolve ALL merge conflicts by keeping BOTH upstream changes and our fork's cust
 - For code files: integrate both sides
 - Use the Edit tool to fix each conflict in place
 - After resolving, verify no conflict markers (<<<<<<< / ======= / >>>>>>>) remain in any file
-- Then run: git add ${CONFLICTED_FILES}"
+- Then run: git add ${CONFLICTED_FILES}" || true
 
-        # Verify all conflicts are resolved
-        REMAINING=$(git diff --name-only --diff-filter=U 2>/dev/null | wc -l)
-        if [[ "$REMAINING" -gt 0 ]]; then
-          print_error "Some conflicts remain unresolved:"
-          git diff --name-only --diff-filter=U
-          print_info "Please resolve manually, then: git add <files> && git commit"
-          exit 1
+        # Check if merge is still in progress
+        if [[ ! -f "$MASTODON_DIR/.git/MERGE_HEAD" ]]; then
+          # Merge already committed or aborted by Claude
+          if git log -1 --oneline 2>/dev/null | grep -qi "merge"; then
+            print_success "Merge already committed"
+          else
+            print_warning "Merge state gone — Claude may have aborted it"
+            print_info "Re-run the script to try again"
+            exit 1
+          fi
+        else
+          # Merge still in progress, check for remaining conflicts
+          REMAINING=$(git diff --name-only --diff-filter=U 2>/dev/null | wc -l)
+          if [[ "$REMAINING" -gt 0 ]]; then
+            print_error "Some conflicts remain unresolved:"
+            git diff --name-only --diff-filter=U
+            print_info "Please resolve manually, then: git add <files> && git commit"
+            exit 1
+          fi
+
+          # All conflicts resolved, commit
+          HUSKY=0 git commit --no-verify -m "Merge $BRANCH_TO_MERGE into $NEW_BRANCH (conflicts resolved)"
+          print_success "Merge conflicts resolved and committed"
         fi
-
-        HUSKY=0 git commit -m "Merge $BRANCH_TO_MERGE into $NEW_BRANCH (conflicts resolved)"
-        print_success "Merge conflicts resolved and committed"
 
         # Restore stashed changes if any
         if [[ "$MERGE_STASH" == "yes" ]]; then
