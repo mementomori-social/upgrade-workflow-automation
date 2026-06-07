@@ -239,7 +239,7 @@ MASTODON_DIR="/your/mastodon/path"
 
 ## About
 
-Created for [mementomori.social](https://mementomori.social) - A Mastodon instance focused on memory, mortality, and mindful living.
+Created for [mementomori.social](https://mementomori.social).
 
 ---
 
