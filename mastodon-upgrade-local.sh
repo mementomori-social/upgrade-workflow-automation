@@ -908,33 +908,42 @@ echo
 print_info "Test URL: $TEST_URL"
 prompt_action "Testing completed"
 
-# Step 11-12: Search index
-if confirm "Reset and rebuild search index?"; then
-  # Start Elasticsearch if needed
-  if ! systemctl is-active --quiet elasticsearch; then
-    print_info "Starting Elasticsearch..."
-    if ! sudo systemctl start elasticsearch; then
-      print_error "Failed to start Elasticsearch"
-      if ! confirm "Continue without search index rebuild?"; then
-        exit 1
+# Step 11-12: Search index (only if a search service is configured)
+SEARCH_SERVICE=""
+if systemctl list-unit-files elasticsearch.service &>/dev/null && systemctl list-unit-files elasticsearch.service | grep -q elasticsearch; then
+  SEARCH_SERVICE="elasticsearch"
+elif systemctl list-unit-files opensearch.service &>/dev/null && systemctl list-unit-files opensearch.service | grep -q opensearch; then
+  SEARCH_SERVICE="opensearch"
+fi
+
+if [[ -n "$SEARCH_SERVICE" ]]; then
+  if confirm "Reset and rebuild search index?"; then
+    if ! systemctl is-active --quiet "$SEARCH_SERVICE"; then
+      print_info "Starting $SEARCH_SERVICE..."
+      if ! sudo systemctl start "$SEARCH_SERVICE"; then
+        print_error "Failed to start $SEARCH_SERVICE"
+        if ! confirm "Continue without search index rebuild?"; then
+          exit 1
+        fi
+      else
+        sleep 5
       fi
+    fi
+
+    if systemctl is-active --quiet "$SEARCH_SERVICE"; then
+      print_info "Resetting search index..."
+      RAILS_ENV=development bin/tootctl search deploy --reset-chewy
+
+      print_info "Rebuilding search index (this may take a while)..."
+      RAILS_ENV=development bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096
+      RAILS_ENV=development bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096
+      print_success "Search index rebuilt"
     else
-      sleep 5
+      print_warning "Skipping search index rebuild ($SEARCH_SERVICE not running)"
     fi
   fi
-
-  # Only proceed with search rebuild if elasticsearch is running
-  if systemctl is-active --quiet elasticsearch; then
-    print_info "Resetting search index..."
-    RAILS_ENV=development bin/tootctl search deploy --reset-chewy
-
-    print_info "Rebuilding search index (this may take a while)..."
-    RAILS_ENV=development bin/tootctl search deploy --only accounts --concurrency 16 --batch_size 4096
-    RAILS_ENV=development bin/tootctl search deploy --only statuses --concurrency 16 --batch_size 4096
-    print_success "Search index rebuilt"
-  else
-    print_warning "Skipping search index rebuild (Elasticsearch not running)"
-  fi
+else
+  print_info "No search service found, skipping search index rebuild"
 fi
 
 # Step 13: Final restart
