@@ -1027,6 +1027,19 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
     MERGE_STASH="yes"
   fi
 
+  # Verify the branch exists (try local first, then origin/)
+  if ! git rev-parse --verify "$BRANCH_TO_MERGE" &>/dev/null; then
+    if git rev-parse --verify "origin/$BRANCH_TO_MERGE" &>/dev/null; then
+      print_info "Branch '$BRANCH_TO_MERGE' not found locally, using origin/$BRANCH_TO_MERGE"
+      BRANCH_TO_MERGE="origin/$BRANCH_TO_MERGE"
+    else
+      print_error "Branch '$BRANCH_TO_MERGE' not found locally or on origin"
+      print_info "Available mementomods branches:"
+      git branch -a | grep mementomods | sort | tail -5
+      exit 1
+    fi
+  fi
+
   print_info "Attempting to merge $BRANCH_TO_MERGE..."
   if git merge "$BRANCH_TO_MERGE"; then
     print_success "Merge successful"
