@@ -1,6 +1,8 @@
 ### 1.3.3: 2026-06-13
 
 * Improve Claude merge conflict prompt: prefer upstream by default, keep fork features only when intentional, ask user when unsure
+* Show real error message on fork sync failure, add workflow scope hint
+* Fix broken fallback URL in manual sync instructions
 
 ### 1.3.2: 2026-05-26
 
