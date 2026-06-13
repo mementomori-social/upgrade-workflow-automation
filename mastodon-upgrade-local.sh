@@ -603,20 +603,20 @@ if command -v gh &> /dev/null; then
   fi
   
   print_info "Syncing fork via GitHub CLI..."
-  if gh repo sync "$YOUR_FORK_REPO" --source "$OFFICIAL_MASTODON_REPO"; then
+  SYNC_OUTPUT=$(gh repo sync "$YOUR_FORK_REPO" --source "$OFFICIAL_MASTODON_REPO" 2>&1) && {
     print_success "Fork synced successfully"
-  else
-    print_error "Fork sync failed"
-    echo "This might be due to:"
-    echo "- Permission issues"
-    echo "- Repository not found"
-    echo "- Network connectivity"
+  } || {
+    print_error "Fork sync failed:"
+    echo "$SYNC_OUTPUT"
     echo
-    print_warning "Please sync manually:"
-    echo "1. Go to https://github.com/$GITHUB_REPO/tree/main"
+    if echo "$SYNC_OUTPUT" | grep -qi "workflow"; then
+      print_warning "Fix: run 'gh auth refresh -s workflow' then re-run this script"
+    fi
+    print_warning "Or sync manually:"
+    echo "1. Go to https://github.com/$YOUR_FORK_REPO/tree/main"
     echo "2. Click 'Sync fork' to sync with upstream main"
     prompt_action "Manual GitHub sync completed"
-  fi
+  }
 else
   print_warning "GitHub CLI not found. Installing..."
   if confirm "Install GitHub CLI automatically?"; then
