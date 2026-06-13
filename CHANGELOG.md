@@ -1,3 +1,7 @@
+### 1.3.3: 2026-06-13
+
+* Improve Claude merge conflict prompt: prefer upstream by default, keep fork features only when intentional, ask user when unsure
+
 ### 1.3.2: 2026-05-26
 
 * Downgrade broken-import warning to INFO when the importing file is orphaned (no other file references it), since Vite tree-shakes it and the build is not affected

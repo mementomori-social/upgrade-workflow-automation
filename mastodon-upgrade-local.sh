@@ -1104,12 +1104,15 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
         print_info "Claude will resolve conflicts in: $CONFLICTED_FILES"
         echo
 
-        claude --dangerously-skip-permissions "This Mastodon fork repo has merge conflicts in these files: ${CONFLICTED_FILES}
+        claude "This Mastodon fork repo has merge conflicts in these files: ${CONFLICTED_FILES}
 
-Resolve ALL merge conflicts by keeping BOTH upstream changes and our fork's customizations where possible. Rules:
+Resolve ALL merge conflicts. Rules:
+- Prefer upstream changes by default
+- Keep our fork's customizations only when they are clearly intentional features
 - For locale files: keep all translations from both sides
-- For db/schema.rb: keep the version with the most columns/features
-- For code files: integrate both sides
+- For db/schema.rb: keep all columns from both sides, use the latest schema version number
+- For code files: prefer upstream unless our fork adds distinct functionality
+- If you are unsure whether a change is an intentional fork feature or just outdated code, ASK the user before deciding
 - Use the Edit tool to fix each conflict in place
 - After resolving, verify no conflict markers (<<<<<<< / ======= / >>>>>>>) remain in any file
 - Then run: git add ${CONFLICTED_FILES}" || true
