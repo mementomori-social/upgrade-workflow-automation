@@ -245,6 +245,14 @@ SIDEKIQ_SERVICES=$(get_sidekiq_services)
 print_info "Detected sidekiq services: $SIDEKIQ_SERVICES"
 
 SERVICE_CHECK=0
+# Check Redis (required by sidekiq and streaming)
+if systemctl is-active --quiet redis; then
+  print_success "Redis is running"
+else
+  print_warning "Redis is not running"
+  SERVICE_CHECK=1
+fi
+
 # Check web and streaming
 for service in mastodon-web mastodon-streaming; do
   if systemctl is-active --quiet "$service"; then

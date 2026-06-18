@@ -458,6 +458,23 @@ SERVICES_TO_START=""
 SIDEKIQ_SERVICES=$(get_sidekiq_services)
 print_info "Detected sidekiq services: $SIDEKIQ_SERVICES"
 
+# Check and start Redis (required by sidekiq and streaming)
+if systemctl is-active --quiet redis; then
+  print_success "Redis is already running"
+else
+  print_warning "Redis is not running - starting it..."
+  sudo systemctl start redis
+  sleep 1
+  if systemctl is-active --quiet redis; then
+    print_success "Redis started successfully"
+  else
+    print_error "Failed to start Redis - sidekiq and streaming will not work without it"
+    if ! confirm "Continue anyway?"; then
+      exit 1
+    fi
+  fi
+fi
+
 # Check nginx, web and streaming services
 for service in nginx mastodon-web mastodon-streaming; do
   if systemctl is-active --quiet "$service"; then

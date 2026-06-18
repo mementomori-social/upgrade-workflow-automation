@@ -1,3 +1,7 @@
+### 1.3.4: 2026-06-18
+
+* Check and auto-start Redis before Mastodon services (both local and production scripts)
+
 ### 1.3.3: 2026-06-13
 
 * Improve Claude merge conflict prompt: prefer upstream by default, keep fork features only when intentional, ask user when unsure
