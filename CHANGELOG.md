@@ -1,3 +1,9 @@
+### 1.4.0: 2026-07-06
+
+* Protect asset precompile from out-of-memory kills: warn when RAM is low, detect an OOM kill instead of hanging silently, and offer a memory-frugal retry
+* Fix the broken-import check falsely flagging referenced files as orphaned by matching relative, tsconfig-alias and dynamic imports by basename
+* Add a "Send to Claude" option for broken imports (like the merge conflict workflow) that auto-fixes package renames and refactors, then rechecks
+
 ### 1.3.4: 2026-06-18
 
 * Check and auto-start Redis before Mastodon services (both local and production scripts)
