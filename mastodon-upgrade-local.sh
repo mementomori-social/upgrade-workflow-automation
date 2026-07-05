@@ -100,10 +100,74 @@ run_cmd() {
   fi
 }
 
+# Precompile assets with out-of-memory protection.
+# The Vite/Rollup build can spike to several GB of RAM. On a loaded dev box the
+# kernel OOM killer silently SIGKILLs node mid-build, which looks like a hang
+# ("Building with Vite" then nothing). This warns when memory is low, diagnoses
+# an OOM kill clearly instead of leaving it cryptic, and offers a memory-frugal
+# retry (capped Node heap). The git side of the upgrade is already done by this
+# point, so a failure here is safe to fix and re-run.
+precompile_assets() {
+  local avail_mb
+  avail_mb=$(free -m | awk '/^Mem:/{print $7}')
+  if [[ -n "$avail_mb" && "$avail_mb" -lt 4096 ]]; then
+    print_warning "Only ${avail_mb}MB RAM available. The asset build (Vite) can use several GB."
+    print_warning "Close memory-heavy apps (browsers, Electron apps) to avoid an out-of-memory kill."
+    if ! confirm "Continue with the asset build anyway?"; then
+      print_error "Asset build skipped (low memory). Free RAM and re-run the script."
+      return 1
+    fi
+  fi
+
+  echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
+  local rc=0
+  RAILS_ENV=development bundle exec rails assets:precompile || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    print_success "Assets precompiled"
+    return 0
+  fi
+
+  # Detect an out-of-memory kill. Signals, most to least reliable:
+  #   - exit 137 = 128 + SIGKILL (the build process itself was killed)
+  #   - a recent kernel OOM event (dmesg; may be root-restricted, so best-effort)
+  #   - build failed while memory was already tight (ruby often exits 1 when its
+  #     node child is OOM-killed, so this catches the common case dmesg misses)
+  local oom=0
+  [[ $rc -eq 137 ]] && oom=1
+  if dmesg 2>/dev/null | tail -n 200 | grep -qiE 'Out of memory|oom-kill'; then
+    oom=1
+  fi
+  if [[ -n "$avail_mb" && "$avail_mb" -lt 6144 ]]; then
+    oom=1
+  fi
+
+  if [[ $oom -eq 1 ]]; then
+    print_error "Asset build was killed by the out-of-memory (OOM) killer, not a code error."
+    print_warning "Current memory:"
+    free -h | sed 's/^/    /'
+    print_warning "Close browsers/Electron apps to free RAM before retrying."
+    if confirm "Retry now with a memory-frugal build (capped Node heap)?"; then
+      print_info "Retrying asset build with reduced memory usage..."
+      rc=0
+      NODE_OPTIONS="--max-old-space-size=3072" \
+        RAILS_ENV=development bundle exec rails assets:precompile || rc=$?
+      if [[ $rc -eq 0 ]]; then
+        print_success "Assets precompiled (frugal retry)"
+        return 0
+      fi
+    fi
+  fi
+
+  print_error "Asset precompile failed (exit $rc). The git upgrade is already complete;"
+  print_error "fix the above and re-run the script to finish the asset build and restart."
+  return 1
+}
+
 # Check custom mod files for imports that no longer exist in package.json
 check_custom_imports() {
   print_info "Checking custom mod files for broken imports..."
   local broken=0
+  local broken_files=""
   local pkg_json="$MASTODON_DIR/package.json"
 
   # Files that are custom mods (not from upstream)
@@ -130,38 +194,88 @@ check_custom_imports() {
     # Orphaned fork files are dead code that Vite tree-shakes, so their broken
     # imports do not actually fail the build. Typical case: a fork override of
     # an upstream file that upstream has since removed.
-    local file_module="${file#app/javascript/}"
-    file_module="${file_module%.*}"
+    local file_base="${file##*/}"
+    file_base="${file_base%.*}"
     local file_refs=""
     for pkg in $imports; do
       if ! grep -q "\"$pkg\"" "$pkg_json" 2>/dev/null && \
          ! [[ -d "$MASTODON_DIR/node_modules/$pkg" ]]; then
         if [[ -z "$file_refs" ]]; then
-          file_refs=$(grep -rlE "from ['\"](@/)?${file_module}['\"]" "$MASTODON_DIR/app/javascript/" \
+          # Match how sibling files actually import this module: relative path
+          # ('./name', '../dir/name'), tsconfig alias ('@/.../name'), full path
+          # ('mastodon/.../name'), and dynamic import(). The old check only matched
+          # the full app/javascript path, so it missed relative imports and wrongly
+          # reported referenced files as orphaned (the "will be tree-shaken" trap).
+          file_refs=$(grep -rlE "(from |import\()['\"]([^'\"]*/)?${file_base}['\"]" "$MASTODON_DIR/app/javascript/" \
                         --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' 2>/dev/null \
                       | grep -v "^${MASTODON_DIR}/${file}$" || echo "__none__")
         fi
         if [[ "$file_refs" == "__none__" ]]; then
-          print_info "Stale fork file (no imports reference it), broken '$pkg' will be tree-shaken: $file"
+          print_warning "Unreferenced fork file with broken import '$pkg' (nothing imports it, so it should tree-shake, but delete it to be safe): $file"
           continue
         fi
         print_warning "Broken import: '$pkg' in $file (not in package.json)"
         print_info "  Suggested fix: check what replaced '$pkg' in upstream and update the import"
         broken=1
+        broken_files="$broken_files $file"
       fi
     done
   done
 
   if [[ "$broken" -eq 1 ]]; then
     print_error "Broken imports detected — build will likely fail"
-    echo ""
-    echo "How to fix: open another terminal and update the imports listed above."
-    echo "Typically upstream renamed a package — check what other files import"
-    echo "the same thing with: grep -r 'Helmet\\|whatever' app/javascript/ --include='*.tsx' | head"
-    echo ""
-    if ! confirm "Continue anyway?"; then
-      exit 1
-    fi
+    echo
+    echo "Options:"
+    echo "  1) Send to Claude Code to fix automatically (default)"
+    echo "  2) Fix manually (open another terminal), then continue"
+    echo "  3) Continue anyway (build will likely fail)"
+    echo "  4) Abort script"
+    echo
+    read -p "Choose option (1/2/3/4) [1]: " -r IMPORT_OPTION
+    IMPORT_OPTION="${IMPORT_OPTION:-1}"
+
+    case "$IMPORT_OPTION" in
+      1)
+        local broken_list
+        broken_list=$(echo "$broken_files" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ')
+        print_info "Launching Claude Code to fix broken imports in: $broken_list"
+        echo
+
+        (cd "$MASTODON_DIR" && claude "This Mastodon fork repo has broken imports after merging upstream. These fork files import npm packages that upstream removed from package.json: ${broken_list}
+
+Fix every broken import. Rules:
+- The package was removed or replaced upstream. Find its replacement by checking how other files in app/javascript/ now import the same functionality (grep for the imported component or hook name).
+- If it is a simple rename to a compatible API (just a moved import path), update the import specifier only.
+- If the replacement has a different API (for example react-overlays replaced by Floating UI), refactor the component to the new API, mirroring how a sibling file in the same directory already does it.
+- Do NOT add the removed package back to package.json.
+- Use the Edit tool to fix each file in place. Do not commit; leave the fixes in the working tree.
+- When done, verify each old package name no longer appears anywhere under app/javascript/.") || true
+
+        echo
+        print_info "Re-checking imports after Claude..."
+        check_custom_imports
+        return
+        ;;
+      2)
+        echo
+        echo "How to fix: open another terminal and update the imports listed above."
+        echo "Typically upstream renamed or replaced a package — check how other files"
+        echo "import the same thing, e.g.: grep -rn 'Helmet' app/javascript/ --include='*.tsx' | head"
+        echo
+        prompt_action "Broken imports fixed"
+        ;;
+      3)
+        print_warning "Continuing with broken imports — the build will likely fail"
+        ;;
+      4)
+        print_error "Script aborted by user"
+        exit 1
+        ;;
+      *)
+        print_error "Invalid option — aborting script"
+        exit 1
+        ;;
+    esac
   else
     print_success "All imports look valid"
   fi
@@ -874,8 +988,7 @@ echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 run_cmd "yarn install --immutable"
 check_custom_imports
-echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
-run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
+precompile_assets
 print_success "Build completed"
 
 # Step 7: Check migrations
@@ -1230,8 +1343,7 @@ run_cmd "bundle install"
 echo -e "${YELLOW}  ⏳ Running yarn install...${NC}"
 run_cmd "yarn install --immutable"
 check_custom_imports
-echo -e "${YELLOW}  ⏳ Precompiling assets...${NC}"
-run_cmd "RAILS_ENV=development bundle exec rails assets:precompile"
+precompile_assets
 
 # Clear toot cache before restart
 print_info "Clearing toot cache..."
