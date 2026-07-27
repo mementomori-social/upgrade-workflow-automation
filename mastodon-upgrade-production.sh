@@ -570,7 +570,7 @@ echo "[ ] Search is functional"
 echo
 print_info "To monitor logs:"
 echo "  sudo journalctl -u mastodon-web.service -f"
-echo "  sudo journalctl -u mastodon-sidekiq.service -f"
+echo "  sudo journalctl -u 'mastodon-sidekiq-*' -f"
 echo "  sudo journalctl -u mastodon-streaming.service -f"
 echo
 print_info "Optional: Search index maintenance (run in screen/tmux):"
