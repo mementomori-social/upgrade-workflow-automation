@@ -128,6 +128,21 @@ get_sidekiq_services() {
   fi
 }
 
+# Function to get all streaming services
+# mastodon-streaming.service is a oneshot shim, and systemd does not propagate
+# restarts through its Wants=, so the templated instances are restarted by name.
+get_streaming_services() {
+  local services
+  services=$(systemctl list-units --all --type=service --plain --no-legend \
+    | grep -oE 'mastodon-streaming@[0-9]+\.service' | sort -u | tr '\n' ' ')
+  if [[ -n "$services" ]]; then
+    echo "$services"
+  else
+    # Fallback to single service name
+    echo "mastodon-streaming"
+  fi
+}
+
 # Check custom mod files for imports that no longer exist in package.json
 check_custom_imports() {
   print_info "Checking custom mod files for broken imports..."
@@ -244,6 +259,9 @@ print_info "Checking current service status..."
 SIDEKIQ_SERVICES=$(get_sidekiq_services)
 print_info "Detected sidekiq services: $SIDEKIQ_SERVICES"
 
+STREAMING_SERVICES=$(get_streaming_services)
+print_info "Detected streaming services: $STREAMING_SERVICES"
+
 SERVICE_CHECK=0
 # Check Redis (required by sidekiq and streaming)
 if systemctl is-active --quiet redis; then
@@ -253,8 +271,8 @@ else
   SERVICE_CHECK=1
 fi
 
-# Check web and streaming
-for service in mastodon-web mastodon-streaming; do
+# Check web and streaming. The shim always reports active, so check instances.
+for service in mastodon-web $STREAMING_SERVICES; do
   if systemctl is-active --quiet "$service"; then
     print_success "$service is running"
   else
@@ -554,7 +572,7 @@ if confirm "Restart services now?"; then
   print_info "Restarting Mastodon services..."
 
   # Restart all detected services
-  sudo systemctl restart mastodon-web mastodon-streaming $SIDEKIQ_SERVICES
+  sudo systemctl restart mastodon-web $STREAMING_SERVICES $SIDEKIQ_SERVICES
 
   print_success "Services restarted"
 else
@@ -586,7 +604,7 @@ echo
 print_info "To monitor logs:"
 echo "  sudo journalctl -u mastodon-web.service -f"
 echo "  sudo journalctl -u 'mastodon-sidekiq-*' -f"
-echo "  sudo journalctl -u mastodon-streaming.service -f"
+echo "  sudo journalctl -u 'mastodon-streaming@*' -f"
 echo
 print_info "Optional: Search index maintenance (run in screen/tmux):"
 echo "  # Reset search index (WARNING: Takes hours!):"
