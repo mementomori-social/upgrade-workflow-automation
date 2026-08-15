@@ -1,3 +1,11 @@
+### 1.4.1: 2026-08-15
+
+* Stop sidekiq during migrations
+* Restart sidekiq even when migrations fail
+* Restart streaming instances by name
+* Check streaming instances in service check
+* Fix streaming log hint
+
 ### 1.4.0: 2026-07-06
 
 * Protect asset precompile from out-of-memory kills: warn when RAM is low, detect an OOM kill instead of hanging silently, and offer a memory-frugal retry
