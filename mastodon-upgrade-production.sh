@@ -517,7 +517,22 @@ if [[ -n "$PENDING_MIGRATIONS" ]]; then
   echo "$PENDING_MIGRATIONS"
   
   if confirm "Run migrations? (This will affect the live database)"; then
-    RAILS_ENV=production bundle exec rails db:migrate
+    # Scheduler refreshes the same materialized views migrations drop, and both
+    # need AccessExclusiveLock, so leaving sidekiq up deadlocks the migration.
+    print_info "Stopping sidekiq during migration..."
+    sudo systemctl stop $SIDEKIQ_SERVICES
+
+    MIGRATION_STATUS=0
+    RAILS_ENV=production bundle exec rails db:migrate || MIGRATION_STATUS=$?
+
+    print_info "Restarting sidekiq..."
+    sudo systemctl start $SIDEKIQ_SERVICES
+
+    if [[ $MIGRATION_STATUS -ne 0 ]]; then
+      print_error "Migrations failed (exit $MIGRATION_STATUS)"
+      echo "The failed migration rolled back. Fix the error above and re-run."
+      exit 1
+    fi
     print_success "Migrations completed"
   else
     print_error "Migrations are required to continue"
