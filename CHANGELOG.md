@@ -1,3 +1,9 @@
+### 1.5.0: 2026-08-23
+
+* Draft the upgrade post from the commit range
+* Filter dependency, translation and lint noise from the summary
+* Add vault directory and post draft toggle to config
+
 ### 1.4.1: 2026-08-15
 
 * Stop sidekiq during migrations

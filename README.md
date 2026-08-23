@@ -1,6 +1,6 @@
 # Mastodon upgrade workflow automation
 
-![Version](https://img.shields.io/badge/version-1.4.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.5.0-blue?style=for-the-badge)
 ![Mastodon](https://img.shields.io/badge/-MASTODON-%236364FF?style=for-the-badge&logo=mastodon&logoColor=white)
 ![bash](https://img.shields.io/badge/bash-%23121011.svg?style=for-the-badge&color=%23222222&logo=gnu-bash&logoColor=white)
 ![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
@@ -54,6 +54,7 @@ bash mastodon-bird-ui-update.sh
 - **Upgrade logging** - Tracks upgrade history for documentation
 - **Safety confirmations** - Production-safe with multiple confirmation prompts
 - **Claude Code merge resolution** - AI-powered merge conflict resolution with per-file review
+- **Upgrade post drafting** - Generates the release post from the commit range for review
 
 ## Scripts
 

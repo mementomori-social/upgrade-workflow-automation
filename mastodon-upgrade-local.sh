@@ -55,6 +55,8 @@ NODE_VERSION="${NODE_VERSION:-22.18.0}"
 SCRIPTS_DIR="${SCRIPTS_DIR:-$SCRIPT_DIR}"
 INSTANCE_URL="${INSTANCE_URL:-https://your-instance.com}"
 TEST_URL="${TEST_URL:-https://your-test-instance.com}"
+OBSIDIAN_VAULT_DIR="${OBSIDIAN_VAULT_DIR:-$HOME/Documents/Obsidian}"
+POST_DRAFT_ENABLED="${POST_DRAFT_ENABLED:-true}"
 STATUS_URL="${STATUS_URL:-https://status.your-instance.com}"
 MAINTENANCE_URL="${MAINTENANCE_URL:-https://your-status-page-url/maintenances}"
 LOCAL_BACKUP_DIR="${LOCAL_BACKUP_DIR:-$SCRIPT_DIR}"
@@ -1390,3 +1392,63 @@ fi
 print_info "  Next step: Run production upgrade script"
 echo
 print_info "Upgrade history saved to: $UPGRADE_LOG"
+
+# Step 21: Draft the upgrade post with Claude Code
+if [[ "$POST_DRAFT_ENABLED" == "true" ]]; then
+  echo
+  print_info "Step 21: Draft the upgrade post"
+
+  PREVIOUS_BRANCH="${CURRENT_VERSION:-}"
+  if [[ -z "$PREVIOUS_BRANCH" ]]; then
+    PREVIOUS_BRANCH=$(cd "$MASTODON_DIR" && git branch --list 'mementomods-*' --sort=-committerdate | sed -n '2p' | tr -d ' *')
+  fi
+
+  if [[ -z "$PREVIOUS_BRANCH" ]]; then
+    print_warning "No previous branch found, skipping the post draft"
+  else
+    POST_FILE="$OBSIDIAN_VAULT_DIR/Mastodon upgrade post $(date +%-d.%-m.%Y).md"
+    RANGE="$PREVIOUS_BRANCH..$NEW_BRANCH"
+    PROMPT_FILE=$(mktemp -t mastodon-post-prompt.XXXXXX)
+
+    {
+      echo "Write the Mastodon upgrade post for this instance."
+      echo
+      echo "Range: $RANGE"
+      echo "New branch: $NEW_BRANCH"
+      echo "Previous branch: $PREVIOUS_BRANCH"
+      echo "Total commits: $(cd "$MASTODON_DIR" && git rev-list --count "$RANGE" 2>/dev/null)"
+      echo "Migrations added: $(cd "$MASTODON_DIR" && git diff --name-only "$RANGE" -- db/migrate db/post_migrate 2>/dev/null | wc -l)"
+      echo "Version file: lib/mastodon/version.rb"
+      echo
+      echo "Write it to: $POST_FILE"
+      echo
+      echo "Rules:"
+      echo "- Match the style of the most recent existing post in the same folder"
+      echo "- Plain text only, no markdown, raw URLs, emoji section headings"
+      echo "- Group into new features, fixes, under the hood, dependencies, our own changes"
+      echo "- Skip dependency bumps, translation syncs and lint commits from the detail"
+      echo "- Do not add a Related section"
+      echo
+      echo "Substantive commits:"
+      cd "$MASTODON_DIR" && git log "$RANGE" --no-merges --format='%s' 2>/dev/null \
+        | grep -viE "New Crowdin|Update dependency|Bump |rubocop|Update .*monorepo|spec|test" \
+        | head -60
+    } > "$PROMPT_FILE"
+
+    print_success "Comparison ready: $PROMPT_FILE"
+
+    if [[ -d "$OBSIDIAN_VAULT_DIR" ]] && command -v claude >/dev/null 2>&1; then
+      if confirm "Draft the post with Claude Code now?"; then
+        (cd "$MASTODON_DIR" && claude -p "$(cat "$PROMPT_FILE")")
+        if [[ -f "$POST_FILE" ]]; then
+          print_success "Draft written to $POST_FILE"
+        else
+          print_warning "No draft file produced, see the output above"
+        fi
+      fi
+    else
+      [[ -d "$OBSIDIAN_VAULT_DIR" ]] || print_info "Vault not reachable from this user, run the draft as your own user"
+      print_info "Run: cd $MASTODON_DIR && claude -p \"\$(cat $PROMPT_FILE)\""
+    fi
+  fi
+fi
