@@ -47,6 +47,23 @@ DB_USER="${DB_USER}"
 BACKUP_DIR="${BACKUP_DIR:-/tmp/mastodon-backups}"
 API_URL="${API_URL:-https://your-instance.com/api/v1/instance}"
 
+# Maintenance notices (Mastodon announcement + Better Stack status page)
+MAINTENANCE_NOTICES_ENABLED="${MAINTENANCE_NOTICES_ENABLED:-true}"
+MAINTENANCE_WINDOW_HOURS="${MAINTENANCE_WINDOW_HOURS:-3}"
+MAINTENANCE_TITLE="${MAINTENANCE_TITLE:-Server maintenance and software updates}"
+BETTERSTACK_TOKEN="${BETTERSTACK_TOKEN}"
+BETTERSTACK_STATUS_PAGE_ID="${BETTERSTACK_STATUS_PAGE_ID:-165860}"
+BETTERSTACK_RESOURCE_IDS="${BETTERSTACK_RESOURCE_IDS:-5116077 8993622 5116078 5190796 5116079 6202381 5116093 5116151 5877704 5695895}"
+
+# Set as plain assignments: an apostrophe inside ${VAR:-default} breaks bash parsing
+if [[ -z "${MAINTENANCE_MESSAGE:-}" ]]; then
+  MAINTENANCE_MESSAGE="We'll be performing Mastodon software and system upgrades soon. May cause some visible notifications or even a minor downtime. Sorry for the inconvenience, and thank you for your patience."
+fi
+
+if [[ -z "${MAINTENANCE_ANNOUNCEMENT_TEXT:-}" ]]; then
+  MAINTENANCE_ANNOUNCEMENT_TEXT="$MAINTENANCE_MESSAGE See progress in https://status.mementomori.social"
+fi
+
 # Support both old and new variable names for backward compatibility
 YOUR_FORK_REPO="${YOUR_FORK_REPO:-${GITHUB_REPO}}"
 OFFICIAL_MASTODON_REPO="${OFFICIAL_MASTODON_REPO:-${UPSTREAM_REPO:-mastodon/mastodon}}"
@@ -357,6 +374,65 @@ else
     print_error "Branch name is required"
     exit 1
   fi
+fi
+
+# Step 0: Maintenance notices
+# Mastodon has no API for creating announcements (only index), so this goes
+# through the same path the admin form uses.
+post_mastodon_announcement() {
+  cd "$MASTODON_DIR"
+  ANNOUNCEMENT_TEXT="$1" STARTS_AT="$2" ENDS_AT="$3" \
+    RAILS_ENV=production bundle exec rails runner '
+      a = Announcement.create!(
+        text: ENV.fetch("ANNOUNCEMENT_TEXT"),
+        starts_at: ENV.fetch("STARTS_AT"),
+        ends_at: ENV.fetch("ENDS_AT"),
+        all_day: false
+      )
+      PublishScheduledAnnouncementWorker.perform_async(a.id) if a.published?
+      puts "announcement id=#{a.id} published=#{a.published?}"
+    '
+}
+
+post_betterstack_maintenance() {
+  local title="$1" message="$2" starts_at="$3" ends_at="$4"
+  local resources payload
+
+  resources=$(printf '%s\n' $BETTERSTACK_RESOURCE_IDS | jq -R '{status_page_resource_id: ., status: "maintenance"}' | jq -s '.')
+  payload=$(jq -n \
+    --arg title "$title" --arg message "$message" \
+    --arg starts_at "$starts_at" --arg ends_at "$ends_at" \
+    --argjson affected "$resources" \
+    '{title: $title, message: $message, report_type: "maintenance",
+      starts_at: $starts_at, ends_at: $ends_at, affected_resources: $affected}')
+
+  curl -sS --fail-with-body -X POST \
+    "https://uptime.betterstack.com/api/v2/status-pages/${BETTERSTACK_STATUS_PAGE_ID}/status-reports" \
+    -H "Authorization: Bearer ${BETTERSTACK_TOKEN}" \
+    -H 'Content-Type: application/json' \
+    --data "$payload" | jq -r '"betterstack report id=" + .data.id'
+}
+
+if [[ "${MAINTENANCE_NOTICES_ENABLED:-true}" == "true" ]] && confirm "Post maintenance notices (Mastodon announcement + status page)?"; then
+  STARTS_AT=$(date -u -d '1 minute ago' +%Y-%m-%dT%H:%M:%SZ)
+  ENDS_AT=$(date -u -d "1 minute ago + ${MAINTENANCE_WINDOW_HOURS:-3} hours" +%Y-%m-%dT%H:%M:%SZ)
+  print_info "Maintenance window: $STARTS_AT to $ENDS_AT"
+
+  if post_mastodon_announcement "$MAINTENANCE_ANNOUNCEMENT_TEXT" "$STARTS_AT" "$ENDS_AT"; then
+    print_success "Mastodon announcement posted"
+  else
+    print_warning "Mastodon announcement failed, continuing"
+  fi
+
+  if [[ -z "$BETTERSTACK_TOKEN" ]]; then
+    print_warning "BETTERSTACK_TOKEN not set, skipping status page"
+  elif post_betterstack_maintenance "$MAINTENANCE_TITLE" "$MAINTENANCE_MESSAGE" "$STARTS_AT" "$ENDS_AT"; then
+    print_success "Status page maintenance posted"
+  else
+    print_warning "Status page maintenance failed, continuing"
+  fi
+else
+  print_info "Skipping maintenance notices"
 fi
 
 # Step 1: Database backup

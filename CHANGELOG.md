@@ -1,3 +1,8 @@
+### 1.6.0: 2026-09-06
+
+* Post the Mastodon announcement and status page maintenance
+* Add maintenance notice texts and Better Stack keys to config
+
 ### 1.5.0: 2026-08-23
 
 * Draft the upgrade post from the commit range
