@@ -281,7 +281,7 @@ print_info "Detected streaming services: $STREAMING_SERVICES"
 
 SERVICE_CHECK=0
 # Check Redis (required by sidekiq and streaming)
-if systemctl is-active --quiet redis; then
+if systemctl is-active --quiet redis || systemctl is-active --quiet valkey-server; then
   print_success "Redis is running"
 else
   print_warning "Redis is not running"
@@ -638,7 +638,7 @@ fi
 
 # Step 7: Clear cache
 print_info "Clearing cache..."
-RAILS_ENV=production /home/mastodon/live/bin/tootctl cache clear
+RAILS_ENV=production "$MASTODON_DIR/bin/tootctl" cache clear
 print_success "Cache cleared"
 
 

@@ -1,3 +1,8 @@
+### 1.6.1: 2026-09-26
+
+* Detect Valkey in the production script
+* Run tootctl from the configured Mastodon path
+
 ### 1.6.0: 2026-09-06
 
 * Post the Mastodon announcement and status page maintenance
