@@ -1,3 +1,7 @@
+### 1.7.0: 2026-10-11
+
+* Upgrade to a specific upstream main commit
+
 ### 1.6.1: 2026-09-26
 
 * Detect Valkey in the production script

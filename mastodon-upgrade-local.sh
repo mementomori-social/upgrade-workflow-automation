@@ -853,6 +853,7 @@ echo
 echo "Enter version to use:"
 echo "- Type 'main' for nightly/development version"
 echo "- Type version number (e.g., '4.5.0' or 'v4.5.0') for specific release"
+echo "- Type a commit hash from upstream main (e.g., '44bb0e8906') to stop at that commit"
 if [[ "$LATEST_STABLE" != "unknown" ]]; then
   echo "- Press Enter to use latest stable: $LATEST_STABLE"
 fi
@@ -879,6 +880,27 @@ if [[ "$VERSION_INPUT" == "main" ]]; then
   print_success "Latest main commit: $MAIN_COMMIT_HASH - $MAIN_COMMIT_MSG"
   print_info "  Date: $MAIN_COMMIT_DATE"
   print_info "  Link: https://github.com/$OFFICIAL_MASTODON_REPO/commit/$MAIN_COMMIT_HASH"
+elif [[ "$VERSION_INPUT" =~ ^[0-9a-f]{7,40}$ ]]; then
+  # A commit on upstream main, for holding back from main's latest changes
+  if ! git cat-file -e "${VERSION_INPUT}^{commit}" 2>/dev/null; then
+    print_error "Commit $VERSION_INPUT not found"
+    exit 1
+  fi
+  if ! git merge-base --is-ancestor "$VERSION_INPUT" "$UPSTREAM_REMOTE/main"; then
+    print_error "Commit $VERSION_INPUT is not on $UPSTREAM_REMOTE/main"
+    exit 1
+  fi
+
+  print_info "Checking out commit $VERSION_INPUT..."
+  yarn cache clean
+  check_and_stash_changes
+  git checkout "$VERSION_INPUT"
+
+  MAIN_COMMIT_HASH=$(git rev-parse --short HEAD)
+  print_success "Checked out commit: $MAIN_COMMIT_HASH - $(git log -1 --pretty=format:"%s" HEAD)"
+  print_info "  Date: $(git log -1 --pretty=format:"%cr" HEAD)"
+  print_info "  Link: https://github.com/$OFFICIAL_MASTODON_REPO/commit/$MAIN_COMMIT_HASH"
+  print_info "  Upstream main is $(git rev-list --count HEAD.."$UPSTREAM_REMOTE/main") commits ahead of it"
 else
   # Add 'v' prefix if not present
   if [[ ! "$VERSION_INPUT" =~ ^v ]]; then
