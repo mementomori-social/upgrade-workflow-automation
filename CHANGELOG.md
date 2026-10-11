@@ -1,6 +1,7 @@
 ### 1.7.0: 2026-10-11
 
 * Upgrade to a specific upstream main commit
+* Write dev version metadata to .env.development.local
 
 ### 1.6.1: 2026-09-26
 

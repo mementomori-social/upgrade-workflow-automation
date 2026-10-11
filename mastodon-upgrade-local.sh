@@ -1310,36 +1310,33 @@ Resolve ALL merge conflicts. Rules:
   fi
 fi
 
-# Step 17: Update version in .env.production
-print_info "Updating version metadata in .env.production..."
-if [[ -f ".env.production" ]]; then
-  # Detect if Bird UI is installed
+# Step 17: Update version metadata for the dev instance
+# Development never loads .env.production; .env.development.local is untracked and wins over .env.development
+DEV_ENV_FILE=".env.development.local"
+print_info "Updating version metadata in $DEV_ENV_FILE..."
+
+set_dev_env() {
+  local key="$1" value="$2"
+  if grep -q "^$key=" "$DEV_ENV_FILE"; then
+    sed -i "s|^$key=.*|$key=$value|" "$DEV_ENV_FILE"
+  else
+    echo "$key=$value" >> "$DEV_ENV_FILE"
+  fi
+}
+
+if [[ -f "$DEV_ENV_FILE" ]]; then
   BIRD_UI_VERSION=""
   if [[ -f "app/javascript/styles/mastodon-bird-ui/layout-single-column.scss" ]]; then
-    # Try to detect Bird UI version from comments in the file
     BIRD_UI_VERSION=" + Mastodon Bird UI"
   fi
-  
-  # Update MASTODON_VERSION_METADATA
-  if grep -q "^MASTODON_VERSION_METADATA=" .env.production; then
-    sed -i "s/^MASTODON_VERSION_METADATA=.*/MASTODON_VERSION_METADATA='$NEW_BRANCH$BIRD_UI_VERSION'/" .env.production
-    print_success "Version metadata updated to: $NEW_BRANCH$BIRD_UI_VERSION"
-  else
-    echo "MASTODON_VERSION_METADATA='$NEW_BRANCH$BIRD_UI_VERSION'" >> .env.production
-    print_success "Version metadata added: $NEW_BRANCH$BIRD_UI_VERSION"
-  fi
-  
-  # Update GITHUB_REPOSITORY for comparison link
-  GITHUB_COMPARE="mastodon/mastodon/compare/main...${YOUR_FORK_REPO:-mementomori-social/mastodon}:$NEW_BRANCH"
-  if grep -q "^GITHUB_REPOSITORY=" .env.production; then
-    sed -i "s|^GITHUB_REPOSITORY=.*|GITHUB_REPOSITORY=$GITHUB_COMPARE|" .env.production
-    print_success "GitHub repository comparison updated"
-  else
-    echo "GITHUB_REPOSITORY=$GITHUB_COMPARE" >> .env.production
-    print_success "GitHub repository comparison added"
-  fi
+
+  set_dev_env MASTODON_VERSION_METADATA "'$NEW_BRANCH$BIRD_UI_VERSION'"
+  print_success "Version metadata set to: $NEW_BRANCH$BIRD_UI_VERSION"
+
+  set_dev_env GITHUB_REPOSITORY "mastodon/mastodon/compare/main...${YOUR_FORK_REPO:-mementomori-social/mastodon}:$NEW_BRANCH"
+  print_success "GitHub repository comparison updated"
 else
-  print_warning ".env.production not found, skipping version update"
+  print_warning "$DEV_ENV_FILE not found, skipping version update"
 fi
 
 # Step 18: Recompile with new branch
