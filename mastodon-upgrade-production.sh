@@ -469,6 +469,36 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   fi
 fi
 
+# Remember what is live, so a failure before migrations can put it back untouched
+PREVIOUS_REF=$(git rev-parse HEAD)
+PREVIOUS_BRANCH=$(git branch --show-current)
+UPGRADE_STAGE="code"
+SCHEMA_BEFORE=""
+STATE_BACKUP=$(mktemp -d)
+cp .env.production "$STATE_BACKUP/env.production" 2>/dev/null || true
+cp public/packs/.vite/manifest.json "$STATE_BACKUP/manifest.json" 2>/dev/null || true
+
+on_failure() {
+  trap - ERR
+  print_error "Upgrade failed at line $1"
+  if [[ "$UPGRADE_STAGE" == "code" ]]; then
+    print_warning "The database and running services are untouched, reverting the checkout..."
+    git checkout -q "${PREVIOUS_BRANCH:-$PREVIOUS_REF}" 2>/dev/null || git checkout -q "$PREVIOUS_REF"
+    [[ -s "$STATE_BACKUP/env.production" ]] && cp "$STATE_BACKUP/env.production" .env.production
+    [[ -s "$STATE_BACKUP/manifest.json" ]] && cp "$STATE_BACKUP/manifest.json" public/packs/.vite/manifest.json
+    yarn install --immutable >/dev/null 2>&1 || print_warning "Could not restore node_modules, run yarn install --immutable before the next restart"
+    print_success "Reverted to $(git log --oneline -1), production keeps running the previous version"
+  else
+    print_warning "Migrations have run, nothing was reverted. To roll back:"
+    echo "  RAILS_ENV=production bundle exec rails db:migrate VERSION=$SCHEMA_BEFORE"
+    echo "  git checkout ${PREVIOUS_BRANCH:-$PREVIOUS_REF}"
+    echo "  bundle install && yarn install --immutable && RAILS_ENV=production bundle exec rails assets:precompile"
+    echo "  sudo systemctl restart mastodon-web $STREAMING_SERVICES $SIDEKIQ_SERVICES"
+  fi
+  exit 1
+}
+trap 'on_failure $LINENO' ERR
+
 # Step 2: Fetch changes
 print_info "Fetching changes from $UPSTREAM_REMOTE..."
 git fetch --all
@@ -532,33 +562,44 @@ fi
 
 # Check Ruby version
 print_info "Checking Ruby version requirements..."
+# Ansible builds Ruby with jemalloc and the gems are compiled against it; a Ruby
+# without it fails to load them ("cannot allocate memory in static TLS block")
+RUBY_CONFIGURE_OPTS="${RUBY_CONFIGURE_OPTS:---with-jemalloc}"
+
+ruby_has_jemalloc() {
+  "$HOME/.rbenv/versions/$1/bin/ruby" -e 'exit(RbConfig::CONFIG["MAINLIBS"].include?("jemalloc") ? 0 : 1)' 2>/dev/null
+}
+
 if [[ -f ".ruby-version" ]]; then
   REQUIRED_RUBY=$(cat .ruby-version)
   print_info "Required Ruby version: $REQUIRED_RUBY"
-  if ! rbenv versions | grep -q "$REQUIRED_RUBY"; then
+  RUBY_INSTALL_FLAGS=""
+  if [[ ! -x "$HOME/.rbenv/versions/$REQUIRED_RUBY/bin/ruby" ]]; then
     print_warning "Ruby $REQUIRED_RUBY is not installed"
-    print_info "Updating ruby-build definitions..."
-    git -C ~/.rbenv/plugins/ruby-build pull || print_warning "Could not update ruby-build (continuing anyway)"
-    
-    if confirm "Install Ruby $REQUIRED_RUBY?"; then
-      if rbenv install "$REQUIRED_RUBY"; then
-        print_success "Ruby $REQUIRED_RUBY installed"
-      else
-        print_error "Failed to install Ruby $REQUIRED_RUBY"
-        print_warning "Continuing with current Ruby version, but build may fail"
-      fi
-    else
-      print_warning "Continuing with current Ruby version, but build may fail"
-    fi
+  elif [[ "$RUBY_CONFIGURE_OPTS" == *jemalloc* ]] && ! ruby_has_jemalloc "$REQUIRED_RUBY"; then
+    print_warning "Ruby $REQUIRED_RUBY is installed without jemalloc and must be rebuilt"
+    RUBY_INSTALL_FLAGS="--force"
   else
     print_success "Ruby $REQUIRED_RUBY is already installed"
+    REQUIRED_RUBY=""
+  fi
+
+  if [[ -n "$REQUIRED_RUBY" ]]; then
+    print_info "Updating ruby-build definitions..."
+    git -C ~/.rbenv/plugins/ruby-build pull || print_warning "Could not update ruby-build (continuing anyway)"
+    if ! confirm "Install Ruby $REQUIRED_RUBY ($RUBY_CONFIGURE_OPTS)?"; then
+      print_error "Ruby $REQUIRED_RUBY is required"
+      false
+    fi
+    RUBY_CONFIGURE_OPTS="$RUBY_CONFIGURE_OPTS" rbenv install $RUBY_INSTALL_FLAGS "$REQUIRED_RUBY"
+    rbenv rehash
+    print_success "Ruby $REQUIRED_RUBY installed"
   fi
 fi
 
 # Step 5: Rebuild
 print_info "Rebuilding application (this may take a while)..."
 yarn cache clean
-rm -rf node_modules
 
 # Check for ICU library compatibility issues before bundle install
 check_and_fix_native_gems
@@ -581,6 +622,14 @@ if grep -q "Incompatible libvips version" /tmp/build_output 2>/dev/null; then
   RAILS_ENV=production bundle exec rails assets:precompile
 fi
 
+# Gate: nothing live has changed yet, so a failure here reverts cleanly
+print_info "Verifying the new build before touching the database..."
+bundle exec ruby -e 'require "openssl"'
+NEW_VERSION=$(RAILS_ENV=production bundle exec rails runner 'print Mastodon::Version.to_s' 2>/dev/null | tail -n1)
+[[ -n "$NEW_VERSION" ]]
+SCHEMA_BEFORE=$(RAILS_ENV=production bundle exec rails runner 'print ActiveRecord::Base.connection.select_value("SELECT max(version) FROM schema_migrations")' 2>/dev/null | tail -n1)
+print_success "New build boots: $NEW_VERSION (schema before upgrade: $SCHEMA_BEFORE)"
+
 # Step 6: Check and run migrations
 print_info "Checking for pending migrations..."
 PENDING_MIGRATIONS=$(RAILS_ENV=production bundle exec rails db:migrate:status | grep down || true)
@@ -594,6 +643,7 @@ if [[ -n "$PENDING_MIGRATIONS" ]]; then
     print_info "Stopping sidekiq during migration..."
     sudo systemctl stop $SIDEKIQ_SERVICES
 
+    UPGRADE_STAGE="database"
     MIGRATION_STATUS=0
     RAILS_ENV=production bundle exec rails db:migrate || MIGRATION_STATUS=$?
 

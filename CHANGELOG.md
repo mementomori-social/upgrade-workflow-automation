@@ -2,6 +2,10 @@
 
 * Back up through the managed postgresql-backup service
 * Remove database host settings from the config
+* Build Ruby with jemalloc like ansible, rebuild one without it
+* Verify the new build boots before touching the database
+* Revert the checkout when an upgrade fails before migrations
+* Stop deleting node_modules under the running streaming server
 
 ### 1.7.0: 2026-10-11
 
