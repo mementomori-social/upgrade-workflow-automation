@@ -154,6 +154,21 @@ If not using a `.env` file, you can edit the scripts directly to customize:
 
 - `PRODUCTION_MASTODON_DIR="/home/mastodon/live"` - Production Mastodon directory
 - `BACKUP_DIR="/mnt/backup"` - Where `postgresql-backup.service` writes its dumps
+- `DB_BACKUP_SSH`, `DB_BACKUP_SSH_KEY` - Optional. When set, the script asks "Back up the database now?" and runs the backup itself over SSH. Without them it prints the manual steps
+
+#### Running the database backup from the script
+
+The script never needs a shell on the database server. Give it a key that can only run
+one command, which starts `postgresql-backup.service`, waits for it and prints the dump
+it produced as `BACKUP=<path>`. In the database server's `authorized_keys` for the
+backup user:
+
+```
+command="sudo /usr/local/bin/upgrade-backup",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA...
+```
+
+and a sudoers rule allowing only that command. Running the key with the argument
+`check` verifies access and the newest dump without taking a new backup.
 
 ## Systemd service configuration
 

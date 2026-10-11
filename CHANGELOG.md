@@ -1,6 +1,7 @@
 ### 1.7.1: 2026-10-11
 
 * Back up through the managed postgresql-backup service
+* Ask to back up the database and run it over SSH when configured
 * Remove database host settings from the config
 * Build Ruby with jemalloc like ansible, rebuild one without it
 * Verify the new build boots before touching the database

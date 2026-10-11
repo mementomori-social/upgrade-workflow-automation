@@ -42,6 +42,10 @@ fi
 MASTODON_DIR="${PRODUCTION_MASTODON_DIR:-/home/mastodon/live}"
 MASTODON_USER="${MASTODON_USER:-mastodon}"
 BACKUP_DIR="${BACKUP_DIR:-/mnt/backup}"
+# user@host whose key may only run the backup trigger on the database server
+DB_BACKUP_SSH="${DB_BACKUP_SSH:-}"
+DB_BACKUP_SSH_KEY="${DB_BACKUP_SSH_KEY:-$HOME/.ssh/id_ed25519_db_backup}"
+BACKUP_FILE=""
 API_URL="${API_URL:-https://your-instance.com/api/v1/instance}"
 
 # Maintenance notices (Mastodon announcement + Better Stack status page)
@@ -422,15 +426,34 @@ else
 fi
 
 # Step 1: Database backup
-print_warning "Take a fresh database backup before proceeding (may already be running from local script)"
-echo "On the database server, start the managed backup, the same job the nightly timer runs:"
-echo
-echo "  sudo systemctl start --no-block postgresql-backup.service"
-echo "  sudo journalctl -fu postgresql-backup.service   # wait for \"Backup complete.\""
-echo "  ls -dt $BACKUP_DIR/mastodon_production_*.backup | head -1"
-echo
-print_warning "This may take 30+ minutes and cause slowness"
-prompt_action "Database backup completed"
+if [[ -n "$DB_BACKUP_SSH" ]]; then
+  if confirm "Back up the database now? (takes about 30 minutes)"; then
+    print_info "Running the managed backup on the database server..."
+    BACKUP_LOG=$(mktemp)
+    set +e
+    ssh -i "$DB_BACKUP_SSH_KEY" -o BatchMode=yes "$DB_BACKUP_SSH" 2>&1 | tee "$BACKUP_LOG"
+    BACKUP_STATUS=${PIPESTATUS[0]}
+    set -e
+    BACKUP_FILE=$(sed -n 's/^BACKUP=//p' "$BACKUP_LOG" | tail -n1)
+    if [[ $BACKUP_STATUS -ne 0 || -z "$BACKUP_FILE" ]]; then
+      print_error "Database backup failed, nothing has been changed"
+      exit 1
+    fi
+    print_success "Database backed up: $BACKUP_FILE"
+  else
+    print_warning "Continuing without a fresh backup, the last nightly backup is the rollback point"
+  fi
+else
+  print_warning "Take a fresh database backup before proceeding (may already be running from local script)"
+  echo "On the database server, start the managed backup, the same job the nightly timer runs:"
+  echo
+  echo "  sudo systemctl start --no-block postgresql-backup.service"
+  echo "  sudo journalctl -fu postgresql-backup.service   # wait for \"Backup complete.\""
+  echo "  ls -dt $BACKUP_DIR/mastodon_production_*.backup | head -1"
+  echo
+  print_warning "This may take 30+ minutes and cause slowness"
+  prompt_action "Database backup completed"
+fi
 
 # Check for incomplete merge before proceeding
 if [[ -f "$PRODUCTION_MASTODON_DIR/.git/MERGE_HEAD" ]]; then
@@ -490,6 +513,7 @@ on_failure() {
     print_success "Reverted to $(git log --oneline -1), production keeps running the previous version"
   else
     print_warning "Migrations have run, nothing was reverted. To roll back:"
+    [[ -n "$BACKUP_FILE" ]] && echo "  (database backup from before this upgrade: $BACKUP_FILE)"
     echo "  RAILS_ENV=production bundle exec rails db:migrate VERSION=$SCHEMA_BEFORE"
     echo "  git checkout ${PREVIOUS_BRANCH:-$PREVIOUS_REF}"
     echo "  bundle install && yarn install --immutable && RAILS_ENV=production bundle exec rails assets:precompile"
