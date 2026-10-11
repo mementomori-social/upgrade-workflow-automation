@@ -521,19 +521,10 @@ fi
 echo
 print_warning "NEXT: Start production database backup now (takes 30+ minutes)"
 echo
-echo "To create a backup, run these commands on the database server:"
+echo "On the production database server, start the managed backup, the same job the nightly timer runs:"
 echo
-echo "ssh -p ${DB_PORT:-5432} ${DB_USER:-your-db-user}@${DB_HOST:-your.db.server.ip}"
-echo "sudo su -"
-echo "ionice -c2 -n7 nice -n19 pg_dump \\"
-echo "  --host=localhost \\"
-echo "  --username=mastodon \\"
-echo "  --port=5432 \\"
-echo "  --format=custom \\"
-echo "  --no-owner \\"
-echo "  --compress=5 \\"
-echo "  --verbose \\"
-echo "  --file=\"${BACKUP_DIR:-/tmp/mastodon-backups}/mastodon_production_\$(date +%Y-%m-%d_%H-%M).backup\""
+echo "  sudo systemctl start --no-block postgresql-backup.service"
+echo "  sudo journalctl -fu postgresql-backup.service   # wait for \"Backup complete.\""
 echo
 print_warning "This may take 30+ minutes and cause slowness"
 print_info "Start this backup now, then continue with the script"

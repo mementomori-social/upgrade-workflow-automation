@@ -1,3 +1,8 @@
+### 1.7.1: 2026-10-11
+
+* Back up through the managed postgresql-backup service
+* Remove database host settings from the config
+
 ### 1.7.0: 2026-10-11
 
 * Upgrade to a specific upstream main commit

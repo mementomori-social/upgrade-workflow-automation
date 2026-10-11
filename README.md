@@ -1,6 +1,6 @@
 # Mastodon upgrade workflow automation
 
-![Version](https://img.shields.io/badge/version-1.7.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.7.1-blue?style=for-the-badge)
 ![Mastodon](https://img.shields.io/badge/-MASTODON-%236364FF?style=for-the-badge&logo=mastodon&logoColor=white)
 ![bash](https://img.shields.io/badge/bash-%23121011.svg?style=for-the-badge&color=%23222222&logo=gnu-bash&logoColor=white)
 ![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
@@ -111,8 +111,7 @@ This automation expects specific Mastodon installation setups:
 ### Permissions
 
 - `mastodon` user must have sudo privileges for service management
-- Write access to backup directory (production)
-- SSH access to database server (if remote)
+- SSH access to the database server, where `postgresql-backup.service` runs
 
 ## Installation
 
@@ -154,8 +153,7 @@ If not using a `.env` file, you can edit the scripts directly to customize:
 #### Production environment settings
 
 - `PRODUCTION_MASTODON_DIR="/home/mastodon/live"` - Production Mastodon directory
-- `DB_HOST`, `DB_PORT`, `DB_USER` - Database server settings for backups
-- `BACKUP_DIR="/tmp/mastodon-backups"` - Where to store database backups
+- `BACKUP_DIR="/mnt/backup"` - Where `postgresql-backup.service` writes its dumps
 
 ## Systemd service configuration
 
@@ -205,7 +203,7 @@ Mastodon loads environment variables from `.env.{environment}.local` files, whic
 
 ### Production deployment
 
-1. **Backup reminder** - Database backup instructions
+1. **Backup reminder** - Start the managed database backup on the database server
 2. **Service validation** - Checks current service status
 3. **Code deployment** - Fetches and applies changes
 4. **Migration** - Runs database migrations with confirmation

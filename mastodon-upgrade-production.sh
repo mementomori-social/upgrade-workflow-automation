@@ -41,10 +41,7 @@ fi
 # Default configuration (can be overridden by .env)
 MASTODON_DIR="${PRODUCTION_MASTODON_DIR:-/home/mastodon/live}"
 MASTODON_USER="${MASTODON_USER:-mastodon}"
-DB_HOST="${DB_HOST}"
-DB_PORT="${DB_PORT:-36424}"
-DB_USER="${DB_USER}"
-BACKUP_DIR="${BACKUP_DIR:-/tmp/mastodon-backups}"
+BACKUP_DIR="${BACKUP_DIR:-/mnt/backup}"
 API_URL="${API_URL:-https://your-instance.com/api/v1/instance}"
 
 # Maintenance notices (Mastodon announcement + Better Stack status page)
@@ -67,17 +64,6 @@ fi
 # Support both old and new variable names for backward compatibility
 YOUR_FORK_REPO="${YOUR_FORK_REPO:-${GITHUB_REPO}}"
 OFFICIAL_MASTODON_REPO="${OFFICIAL_MASTODON_REPO:-${UPSTREAM_REPO:-mastodon/mastodon}}"
-
-# Validate required environment variables
-if [[ -z "$DB_HOST" ]]; then
-  print_error "DB_HOST not set. Please configure in .env file."
-  exit 1
-fi
-
-if [[ -z "$DB_USER" ]]; then
-  print_error "DB_USER not set. Please configure in .env file."
-  exit 1
-fi
 
 # Function to print colored messages
 print_info() {
@@ -436,20 +422,12 @@ else
 fi
 
 # Step 1: Database backup
-print_warning "Database backup is required before proceeding (may already be running from local script)"
-echo "To create a backup, run these commands on the database server:"
+print_warning "Take a fresh database backup before proceeding (may already be running from local script)"
+echo "On the database server, start the managed backup, the same job the nightly timer runs:"
 echo
-echo "ssh -p $DB_PORT $DB_USER@$DB_HOST"
-echo "sudo su -"
-echo "ionice -c2 -n7 nice -n19 pg_dump \\"
-echo "  --host=localhost \\"
-echo "  --username=mastodon \\"
-echo "  --dbname=mastodon_production \\"
-echo "  --format=directory \\"
-echo "  --jobs=2 \\"
-echo "  --compress=5 \\"
-echo "  --verbose \\"
-echo "  --file=\"$BACKUP_DIR/mastodon_production_\$(date +%Y-%m-%d_%H-%M).backup\""
+echo "  sudo systemctl start --no-block postgresql-backup.service"
+echo "  sudo journalctl -fu postgresql-backup.service   # wait for \"Backup complete.\""
+echo "  ls -dt $BACKUP_DIR/mastodon_production_*.backup | head -1"
 echo
 print_warning "This may take 30+ minutes and cause slowness"
 prompt_action "Database backup completed"
