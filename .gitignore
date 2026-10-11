@@ -2,6 +2,7 @@
 .env
 .env.development
 .env.production
+*.bak*
 
 # Log files
 *.log
