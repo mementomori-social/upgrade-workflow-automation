@@ -622,6 +622,13 @@ if [[ -f ".ruby-version" ]]; then
 fi
 
 # Step 5: Rebuild
+REQUIRED_NODE_MAJOR=$(grep -oP '"node":\s*">=\K[0-9]+' package.json || echo "")
+CURRENT_NODE_MAJOR=$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')
+if [[ -n "$REQUIRED_NODE_MAJOR" && "${CURRENT_NODE_MAJOR:-0}" -lt "$REQUIRED_NODE_MAJOR" ]]; then
+  print_error "Node.js $REQUIRED_NODE_MAJOR or newer is required, found $(node --version 2>/dev/null || echo 'none')"
+  false
+fi
+
 print_info "Rebuilding application (this may take a while)..."
 yarn cache clean
 
