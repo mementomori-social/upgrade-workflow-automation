@@ -1,3 +1,11 @@
+### 1.8.0: 2026-11-07
+
+* Update Bird UI with its own install script
+* Detect Bird UI 5 for the version metadata
+* Require Node.js 24 for Mastodon 5
+* Skip the legacy sidekiq unit next to the fleet
+* Document the move to Mastodon 5
+
 ### 1.7.1: 2026-10-11
 
 * Back up through the managed postgresql-backup service

@@ -1,6 +1,6 @@
 # Mastodon upgrade workflow automation
 
-![Version](https://img.shields.io/badge/version-1.7.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.8.0-blue?style=for-the-badge)
 ![Mastodon](https://img.shields.io/badge/-MASTODON-%236364FF?style=for-the-badge&logo=mastodon&logoColor=white)
 ![bash](https://img.shields.io/badge/bash-%23121011.svg?style=for-the-badge&color=%23222222&logo=gnu-bash&logoColor=white)
 ![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
@@ -215,6 +215,12 @@ Mastodon loads environment variables from `.env.{environment}.local` files, whic
 6. **Migration** - Handles database migrations
 7. **Branch management** - Creates new branch and merges mods
 8. **Verification** - Manual testing checklist
+
+### Moving from Mastodon 4 to Mastodon 5
+
+The fork's Mastodon 5 work lives on a branch built on upstream main, not on the previous `mementomods-*` branch. In the development upgrade, when the script asks "Merge customizations from which branch?", type that branch name (for example `v5-dev`) instead of pressing Enter. Pressing Enter would merge the Mastodon 4 branch into Mastodon 5. Later upgrades work as before.
+
+Mastodon 5 needs Node.js 24 or newer. The production script stops before building when the server's Node.js is older.
 
 ### Production deployment
 
