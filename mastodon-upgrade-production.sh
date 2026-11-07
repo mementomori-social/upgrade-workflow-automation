@@ -552,7 +552,7 @@ print_info "Updating version metadata in .env.production..."
 if [[ -f ".env.production" ]]; then
   # Detect if Bird UI is installed
   BIRD_UI_VERSION=""
-  if [[ -f "app/javascript/styles/mastodon-bird-ui/layout-single-column.scss" ]]; then
+  if [[ -f "app/javascript/styles/mastodon-bird-ui/layout-single-column.scss" || -f "app/javascript/styles/mastodon-bird-ui/_index.scss" ]]; then
     # Try to detect Bird UI version from comments in the file
     BIRD_UI_VERSION=" + Mastodon Bird UI"
   fi

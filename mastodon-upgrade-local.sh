@@ -1317,7 +1317,7 @@ set_dev_env() {
 
 if [[ -f "$DEV_ENV_FILE" ]]; then
   BIRD_UI_VERSION=""
-  if [[ -f "app/javascript/styles/mastodon-bird-ui/layout-single-column.scss" ]]; then
+  if [[ -f "app/javascript/styles/mastodon-bird-ui/layout-single-column.scss" || -f "app/javascript/styles/mastodon-bird-ui/_index.scss" ]]; then
     BIRD_UI_VERSION=" + Mastodon Bird UI"
   fi
 
