@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mastodon Bird UI Update Script
-# Gets the latest mastodon-bird-ui from https://github.com/ronilaukkarinen/mastodon-bird-ui and applies it to use on your supported Mastodon fork.
+# Gets the latest Mastodon Bird UI from https://github.com/rollecode/mastodon-bird-ui and installs it with its own install script.
 
 # This script automates the Mastodon Bird UI update process for local development
 # Version: $(head -n1 "$(dirname "${BASH_SOURCE[0]}")/CHANGELOG.md" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.3")
@@ -40,6 +40,8 @@ fi
 # Default configuration (can be overridden by .env)
 MASTODON_DIR="${MASTODON_DIR:-/opt/mastodon}"
 MASTODON_USER="${MASTODON_USER:-mastodon}"
+BIRD_UI_REPO="${BIRD_UI_REPO:-https://github.com/rollecode/mastodon-bird-ui.git}"
+BIRD_UI_DIR="${BIRD_UI_DIR:-$HOME/mastodon-bird-ui}"
 YOUR_FORK_REPO="${YOUR_FORK_REPO:-${GITHUB_REPO:-your-org/mastodon}}"
 OFFICIAL_MASTODON_REPO="${OFFICIAL_MASTODON_REPO:-${UPSTREAM_REPO:-mastodon/mastodon}}"
 
@@ -98,20 +100,11 @@ if [[ ! -d "app/javascript/styles/mastodon-bird-ui" ]]; then
   exit 1
 fi
 
-# Detect OS for sed command differences
-OS_TYPE="linux"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  OS_TYPE="mac"
-  print_info "Detected macOS environment"
-else
-  print_info "Detected Linux environment"
-fi
-
 # Ask for version preference
 echo
 echo "Enter branch to use:"
-echo "- Type 'nightly' for nightly/release candidate version"
-echo "- Type 'main' for stable version"
+echo "- Type 'nightly' for the version that targets Mastodon main (Mastodon 5)"
+echo "- Type 'main' for the version that targets the latest Mastodon 4 release"
 echo "- Press Enter to use nightly (default)"
 read -p "Branch: " -r BRANCH_INPUT
 
@@ -131,137 +124,75 @@ else
   exit 1
 fi
 
-# Check write permissions
-if [[ ! -w "app/javascript/styles/mastodon-bird-ui" ]]; then
-  print_error "No write permission to app/javascript/styles/mastodon-bird-ui"
-  print_info "Please check file ownership. Current user: $USER"
-  print_info "Directory owner: $(stat -c '%U' app/javascript/styles/mastodon-bird-ui 2>/dev/null || echo 'unknown')"
-  print_info "You may need to run:"
-  echo "  sudo chown -R $USER:$USER app/javascript/styles/mastodon-bird-ui"
+# Get the Bird UI source at the chosen branch
+if [[ -d "$BIRD_UI_DIR/.git" ]]; then
+  print_info "Updating Bird UI checkout in $BIRD_UI_DIR..."
+  git -C "$BIRD_UI_DIR" fetch --quiet origin
+  git -C "$BIRD_UI_DIR" checkout --quiet "$BRANCH"
+  git -C "$BIRD_UI_DIR" reset --quiet --hard "origin/$BRANCH"
+else
+  print_info "Cloning Bird UI into $BIRD_UI_DIR..."
+  git clone --quiet --branch "$BRANCH" "$BIRD_UI_REPO" "$BIRD_UI_DIR"
+fi
+
+INSTALL_SCRIPT="$BIRD_UI_DIR/scripts/install-to-mastodon.sh"
+if [[ ! -f "$INSTALL_SCRIPT" ]]; then
+  print_error "Install script not found: $INSTALL_SCRIPT"
+  print_info "The '$BRANCH' branch predates the install script, use a newer branch"
   exit 1
 fi
 
-# Download and process CSS files
-print_info "Downloading Mastodon Bird UI CSS files..."
+BIRD_UI_VERSION=$(grep -m1 '^### ' "$BIRD_UI_DIR/CHANGELOG.md" | sed 's/### \([^:]*\):.*/\1/')
+print_info "Installing Mastodon Bird UI $BIRD_UI_VERSION ($BRANCH branch)..."
 
-# Download single column layout using temp file approach
-print_info "Downloading single column layout..."
-TEMP_FILE="/tmp/bird-ui-single-column-$$.css"
-if wget --no-check-certificate --no-cache --no-cookies --no-http-keep-alive \
-  "https://raw.githubusercontent.com/ronilaukkarinen/mastodon-bird-ui/$BRANCH/layout-single-column.css" \
-  -O "$TEMP_FILE"; then
-  mv "$TEMP_FILE" app/javascript/styles/mastodon-bird-ui/layout-single-column.scss
-  print_success "Single column layout downloaded"
-else
-  print_error "Failed to download single column layout"
-  rm -f "$TEMP_FILE"
-  exit 1
-fi
+# Bird UI is the default theme here, with the accessible themes
+bash "$INSTALL_SCRIPT" --path "$MASTODON_DIR" --variations --default
 
-# Download multiple column layout using temp file approach
-print_info "Downloading multiple column layout..."
-TEMP_FILE="/tmp/bird-ui-multiple-columns-$$.css"
-if wget --no-check-certificate --no-cache --no-cookies --no-http-keep-alive \
-  "https://raw.githubusercontent.com/ronilaukkarinen/mastodon-bird-ui/$BRANCH/layout-multiple-columns.css" \
-  -O "$TEMP_FILE"; then
-  mv "$TEMP_FILE" app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
-  print_success "Multiple column layout downloaded"
-else
-  print_error "Failed to download multiple column layout"
-  rm -f "$TEMP_FILE"
-  exit 1
-fi
-
-# Apply theme replacements based on OS
-print_info "Applying theme replacements..."
-
-if [[ "$OS_TYPE" == "mac" ]]; then
-  # macOS sed commands (with backup files)
-  print_info "Applying macOS-specific sed commands..."
-  
-  # Single column replacements
-  sed -i'.bak' -e 's/theme-contrast/theme-mastodon-bird-ui-contrast/g' app/javascript/styles/mastodon-bird-ui/layout-single-column.scss
-  sed -i'.bak' -e 's/.theme-mastodon-light/[class\*='\''theme-mastodon-bird-ui-light'\'']/g' app/javascript/styles/mastodon-bird-ui/layout-single-column.scss
-  
-  # Multiple column replacements  
-  sed -i'.bak' -e 's/theme-contrast/theme-mastodon-bird-ui-contrast/g' app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
-  sed -i'.bak' -e 's/.theme-mastodon-light/[class\*='\''theme-mastodon-bird-ui-light'\'']/g' app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
-  
-  # Clean up backup files
-  rm -f app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss.bak
-  rm -f app/javascript/styles/mastodon-bird-ui/layout-single-column.scss.bak
-  
-else
-  # Linux sed commands (no backup files)
-  print_info "Applying Linux-specific sed commands..."
-  
-  # Single column replacements
-  sed -i 's/theme-contrast/theme-mastodon-bird-ui-contrast/g' app/javascript/styles/mastodon-bird-ui/layout-single-column.scss
-  sed -i 's/.theme-mastodon-light/[class\*='\''theme-mastodon-bird-ui-light'\'']/g' app/javascript/styles/mastodon-bird-ui/layout-single-column.scss
-  
-  # Multiple column replacements
-  sed -i 's/theme-contrast/theme-mastodon-bird-ui-contrast/g' app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
-  sed -i 's/.theme-mastodon-light/[class\*='\''theme-mastodon-bird-ui-light'\'']/g' app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
-fi
-
-print_success "Theme replacements applied"
-
-# Show what was updated
 echo
-print_info "Updated files:"
-print_success "  ✓ app/javascript/styles/mastodon-bird-ui/layout-single-column.scss"
-print_success "  ✓ app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss"
+print_info "Changed files:"
+git status --short -- app/javascript/styles config/themes.yml config/locales/en.yml config/locales/fi.yml
 
-# Optional: Commit and push changes
+if git diff --quiet && [[ -z "$(git status --porcelain -- app/javascript/styles)" ]]; then
+  print_success "Bird UI is already up to date"
+  exit 0
+fi
+
 echo
-if confirm "Commit and push changes to git?"; then
-  # Detect current Bird UI version if possible
-  BIRD_UI_VERSION="latest"
-  if [[ "$BRANCH" == "nightly" ]]; then
-    BIRD_UI_VERSION="nightly"
+if confirm "Commit the update?"; then
+  git add app/javascript/styles config/themes.yml config/locales/en.yml config/locales/fi.yml
+  git commit --no-verify -m "Update vendored Bird UI"
+  print_success "Committed: Update vendored Bird UI ($BIRD_UI_VERSION)"
+
+  if confirm "Push the branch to origin?"; then
+    git push
+    print_success "Pushed"
   fi
-  
-  print_info "Adding files to git..."
-  git add app/javascript/styles/mastodon-bird-ui/layout-single-column.scss
-  git add app/javascript/styles/mastodon-bird-ui/layout-multiple-columns.scss
-  
-  print_info "Committing changes..."
-  git commit --no-verify -m "Update to Mastodon Bird UI $BIRD_UI_VERSION ($BRANCH branch)"
-  
-  print_info "Pushing to origin..."
-  git push
-  
-  print_success "Changes committed and pushed"
 else
-  print_warning "Changes not committed - manual commit required"
-  echo "To commit manually:"
-  echo "  git add app/javascript/styles/mastodon-bird-ui/"
-  echo "  git commit -m 'Update to Mastodon Bird UI $BIRD_UI_VERSION'"
-  echo "  git push"
+  print_warning "Not committed, the changes are in the working tree"
 fi
 
-# Optional: Rebuild assets and restart services
+# The production fleet runs templated sidekiq units; the plain unit is legacy
+get_sidekiq_services() {
+  local services
+  services=$(systemctl list-units --all --type=service --plain --no-legend \
+    | awk '{print $1}' | grep -E '^mastodon-sidekiq-.+\.service$' | tr '\n' ' ')
+  echo "${services:-mastodon-sidekiq}"
+}
+
 echo
-if confirm "Rebuild assets and restart services for immediate effect?"; then
+if confirm "Rebuild assets and restart services?"; then
   print_info "Rebuilding assets..."
   RAILS_ENV=production bundle exec rails assets:precompile
-  
-  print_info "Restarting Mastodon services..."
-  sudo systemctl restart mastodon-web mastodon-sidekiq mastodon-streaming
-  sleep 5
-  sudo systemctl restart postgresql
-  
+
+  SIDEKIQ_SERVICES=$(get_sidekiq_services)
+  print_info "Restarting mastodon-web and $SIDEKIQ_SERVICES..."
+  sudo systemctl restart mastodon-web $SIDEKIQ_SERVICES
   print_success "Assets rebuilt and services restarted"
 else
   print_warning "Assets not rebuilt - manual rebuild required for changes to take effect"
-  echo "To rebuild manually:"
   echo "  RAILS_ENV=production bundle exec rails assets:precompile"
-  echo "  sudo systemctl restart mastodon-web mastodon-sidekiq mastodon-streaming"
+  echo "  sudo systemctl restart mastodon-web <sidekiq units>"
 fi
 
 echo
-print_success "Mastodon Bird UI update completed!"
-print_info "SUMMARY:"
-print_success "  Bird UI version: $BIRD_UI_VERSION ($BRANCH branch)"
-print_success "  OS detected: $OS_TYPE"
-print_info "  Files updated: layout-single-column.scss, layout-multiple-columns.scss"
+print_success "Mastodon Bird UI $BIRD_UI_VERSION ($BRANCH branch) installed"
