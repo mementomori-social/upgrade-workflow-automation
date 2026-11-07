@@ -127,6 +127,9 @@ confirm() {
 # Function to get all sidekiq services
 get_sidekiq_services() {
   local services=$(systemctl list-units --all --type=service --plain --no-legend | grep 'mastodon-sidekiq' | awk '{print $1}' | tr '\n' ' ')
+  # The plain unit is the legacy monolith; running it beside the fleet runs out of memory
+  local fleet=$(echo "$services" | tr ' ' '\n' | grep -E '^mastodon-sidekiq-.+\.service$' | tr '\n' ' ')
+  [[ -n "$fleet" ]] && services="$fleet"
   if [[ -n "$services" ]]; then
     echo "$services"
   else
