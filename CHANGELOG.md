@@ -1,3 +1,9 @@
+### 1.9.0: 2026-11-22
+
+* Add test content for every view after local upgrades
+* Change merge fixer to Opus 5.5 by default
+* Add timestamped name and blue color to merge fixer
+
 ### 1.8.0: 2026-11-07
 
 * Update Bird UI with its own install script

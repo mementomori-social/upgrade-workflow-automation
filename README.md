@@ -67,7 +67,9 @@ bash mastodon-bird-ui-update.sh
 - Manages GitHub fork sync workflow
 - Builds and tests changes
 - Creates new versioned branches
-- Merges modifications from previous branches
+- Merges modifications from previous branches, with Claude on `MERGE_FIXER_MODEL` (default `claude-opus-5-5`) for conflicts
+- Fills every view with test content, skip with `SEED_TEST_CONTENT=false`. To refresh it later:
+  `cd /opt/mastodon && RAILS_ENV=development bin/rails runner ~/upgrade-workflow-automation/mastodon-seed-test-content.rb`
 
 ### Production deployment script
 

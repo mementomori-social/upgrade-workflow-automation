@@ -62,6 +62,9 @@ MAINTENANCE_URL="${MAINTENANCE_URL:-https://your-status-page-url/maintenances}"
 LOCAL_BACKUP_DIR="${LOCAL_BACKUP_DIR:-$SCRIPT_DIR}"
 LOCAL_DB_NAME="${LOCAL_DB_NAME:-mastodon_development}"
 WEB_PORT="${WEB_PORT:-3000}"
+SEED_TEST_CONTENT="${SEED_TEST_CONTENT:-true}"
+MERGE_FIXER_MODEL="${MERGE_FIXER_MODEL:-claude-opus-5-5}"
+MERGE_FIXER_COLOR="${MERGE_FIXER_COLOR:-blue}"
 
 # Function to print colored messages
 print_info() {
@@ -91,6 +94,38 @@ prompt_action() {
 confirm() {
   read -p "$1 (y/n): " -r
   [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+seed_test_content() {
+  local seeder="$SCRIPT_DIR/mastodon-seed-test-content.rb"
+
+  if [[ "$SEED_TEST_CONTENT" != "true" ]]; then
+    return 0
+  fi
+
+  print_info "Filling Explore, notifications and the feeds with test content..."
+  if RAILS_ENV=development bin/rails runner "$seeder"; then
+    print_success "Test content ready"
+  else
+    print_warning "Seeding test content failed, some views may be empty"
+  fi
+}
+
+run_merge_fixer() {
+  local prompt="$1"
+  local name session_id
+  name="mastodon-merge-conflict-fixer-$(date +%Y-%m-%d-%H%M%S)"
+  session_id=$(cat /proc/sys/kernel/random/uuid)
+  local args=(--model "$MERGE_FIXER_MODEL" --name "$name")
+
+  # There is no color flag: run /color on the new session, then resume it
+  if claude -p --session-id "$session_id" "${args[@]}" "/color $MERGE_FIXER_COLOR" < /dev/null > /dev/null; then
+    args+=(--resume "$session_id")
+  else
+    print_warning "Could not set the session color, starting without it"
+  fi
+
+  claude "${args[@]}" "$prompt"
 }
 
 # Function to run a command and show which command failed
@@ -1249,7 +1284,7 @@ if [[ -n "$BRANCH_TO_MERGE" ]]; then
         print_info "Claude will resolve conflicts in: $CONFLICTED_FILES"
         echo
 
-        claude "This Mastodon fork repo has merge conflicts in these files: ${CONFLICTED_FILES}
+        run_merge_fixer "This Mastodon fork repo has merge conflicts in these files: ${CONFLICTED_FILES}
 
 Resolve ALL merge conflicts. Rules:
 - Prefer upstream changes by default
@@ -1371,6 +1406,8 @@ else
   sudo systemctl restart postgresql
 fi
 print_success "Recompiled and restarted"
+
+seed_test_content
 
 # Step 19: Final testing and git push (search rebuild not needed for local)
 print_info "Local development upgrade process completed"
