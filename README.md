@@ -11,7 +11,7 @@ Automated bash scripts for managing Mastodon instance upgrades, designed for the
 
 ## When it's upgrade day - Test and upgrade workflow with [the scripts](https://github.com/mementomori-social/upgrade-workflow-automation)
 
-You don't even have to create announcement and status page update manually, the script will prompt about it.
+The local script prompts for the announcement and the status page maintenance at the start, so the production script doesn't ask again.
 
 ```bash
 sudo su mastodon

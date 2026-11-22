@@ -1,3 +1,7 @@
+### 1.9.1: 2026-11-22
+
+* Remove maintenance notices from the production script
+
 ### 1.9.0: 2026-11-22
 
 * Add test content for every view after local upgrades
